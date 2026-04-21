@@ -5,6 +5,38 @@
 
 ---
 
+## Session 2026-04-21 21:50 — Repo public + branch protection appliquée
+
+- **Opérateur** : Claude Code (Opus 4.7) — déclencheur : user "1- passer public"
+- **Objectif** : résoudre DETTE-013 en passant le repo public pour activer Rulesets gratuits.
+
+### Déroulé
+
+1. `gh repo edit --visibility public --accept-visibility-change-consequences` ✓
+2. `gh api POST /rulesets` avec config `main-protection` : deletion + non_fast_forward + required_linear_history + pull_request (1 review, code owners, dismiss stale, last push approval, thread resolution) + required_status_checks strict (Lint + Typecheck + Unit tests + docker smoke) → **ruleset id 15364662 créé**.
+3. `gh api PATCH` activation secret scanning + push protection ✓
+4. `gh api PUT` vulnerability-alerts + automated-security-fixes → Dependabot alerts activés ✓
+5. PROGRESS.md : DETTE-013 fermée, décision "repo public" ajoutée aux décisions figées. `docs/github-branch-protection.md` mis à jour.
+
+### Livrables
+
+- Repo passé public (irréversible pratiquement)
+- Ruleset `main-protection` actif sur `refs/heads/main`
+- Secret scanning + push protection + Dependabot security updates actifs
+
+### Conséquences
+
+- Tout push direct à `main` refusé. Merge uniquement via PR avec 1 review code owner + status checks verts.
+- Pas de force-push ni de suppression de branche `main` possibles.
+- Linear history imposée (rebase merge seulement, pas de merge commits).
+- Le code et les docs métier sont publics — aucun secret n'y figure (CLAUDE.md §3.4 + `.env.example` respectés). Possibilité future de fork et de stars, pas un problème à ce stade.
+
+### Décision
+
+**Repo public** retenu vs GitHub Pro : (1) zéro coût récurrent, (2) ouvre la porte à OSS partiel si stratégique plus tard, (3) transparence métier cohérente avec la culture suisse d'ingénierie (même chose côté Swisscom, Infomaniak).
+
+---
+
 ## Session 2026-04-21 21:20 — Déblocage BLOCKER-003, BLOCKER-004, DETTE-007
 
 - **Opérateur** : Claude Code (Opus 4.7) — déclencheur : user "blocker-003 on fait gcp / fait blocker-004 / fait dette-007"

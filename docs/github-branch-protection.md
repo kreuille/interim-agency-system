@@ -1,7 +1,7 @@
-# Branch protection `main` — GitHub (action humaine)
+# Branch protection `main` — GitHub
 
-> La protection de branche ne se configure **pas** via un fichier versionné (contrairement à GitLab où `.gitlab/push_rules.yml` existe). Elle doit être activée à la main dans l'UI GitHub ou via l'API.
-> Cette page décrit la configuration exacte attendue pour rester conforme à `CLAUDE.md §2.5`.
+> **Statut** : ✅ **Appliqué le 2026-04-21** via GitHub Rulesets (repo public + ruleset id 15364662).
+> Cette page garde la configuration de référence pour reproduire sur un autre repo.
 
 ## Pré-requis
 

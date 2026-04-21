@@ -129,6 +129,7 @@ Décisions prises et non renégociables sans ADR. Mettre à jour au fil de l'eau
 | 2026-04-21 | Hébergement GCP `europe-west6` (Zurich) — Cloud Run + Cloud SQL + CMEK | `docs/adr/0002-hosting-choice.md` | Fondateur |
 | 2026-04-21 | Auth Firebase Identity Platform multi-tenancy native | `docs/adr/0003-auth-choice.md` | Fondateur |
 | 2026-04-21 | RBAC 7 rôles × 12 actions typés ; MFA obligatoire pour `agency_admin` + `payroll_officer` | `packages/domain/src/auth/role.ts` | A0.6 |
+| 2026-04-21 | Repo **public** — GitHub Rulesets `main-protection` + secret scanning + Dependabot alerts activés | ruleset id 15364662 | Fondateur |
 
 ---
 
@@ -183,7 +184,7 @@ Décisions prises et non renégociables sans ADR. Mettre à jour au fil de l'eau
 | DETTE-010 | 2026-04-21 | A0.5 | Wrapper Prisma middleware qui injecte `where: { agencyId }` automatiquement (CLAUDE.md §3.5) | H | avant A1.1 |
 | DETTE-011 | 2026-04-21 | A0.5 | Tests d'intégration Prisma via Testcontainers Postgres pour isolation tenant réelle | H | avant A1.1 |
 | DETTE-012 | 2026-04-21 | A0.5 | Container `api` dans docker-compose pour tests E2E webhook → api → db | M | A3 |
-| DETTE-013 | 2026-04-21 | déblocage | **Branch protection/Rulesets GitHub** — payants sur repo privé. Trancher GitHub Pro (~4 USD/mo), repo public, ou laisser ouvert. Remplace DETTE-007. | H | S1 |
+| ~~DETTE-013~~ | 2026-04-21 | déblocage | ~~Branch protection/Rulesets GitHub~~ — **fermée 2026-04-21** : repo passé public, ruleset `main-protection` créé (id 15364662), secret scanning + push protection + Dependabot alerts activés | ~~H~~ | ✅ |
 | DETTE-014 | 2026-04-21 | déblocage | Créer projets Firebase `interim-agency-system` + `-staging` selon `docs/firebase-setup.md` | H | S1 |
 | DETTE-015 | 2026-04-21 | déblocage | Provisionner GCP `europe-west6` (Cloud SQL, Memorystore, Cloud Storage, Secret Manager, OIDC WIF) selon ADR-0002 | H | S2 |
 | DETTE-016 | 2026-04-21 | déblocage | Cloud Function `onCreate` qui pose les custom claims `agencyId` + `role` à l'inscription | M | A1.7 |
