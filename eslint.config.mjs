@@ -37,6 +37,12 @@ export default tseslint.config(
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
       ],
       'import/no-default-export': 'off',
+      'security/detect-object-injection': 'off',
+    },
+  },
+  {
+    files: ['packages/domain/**/*.ts', 'packages/application/**/*.ts'],
+    rules: {
       'no-restricted-imports': [
         'error',
         {
@@ -44,12 +50,11 @@ export default tseslint.config(
             {
               group: ['**/infrastructure/**', '**/infrastructure'],
               message:
-                'Le package `domain` ne doit pas importer depuis `infrastructure` (architecture hexagonale).',
+                'Les packages `domain` et `application` ne doivent pas importer depuis `infrastructure` (architecture hexagonale).',
             },
           ],
         },
       ],
-      'security/detect-object-injection': 'off',
     },
   },
   {

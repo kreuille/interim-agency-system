@@ -1,0 +1,217 @@
+openapi: 3.0.3
+info:
+  title: Agence d'Intérim — Back-office API
+  version: 0.1.0
+  description: >
+    API interne pour le back-office agence. Authentification JWT Firebase,
+    multi-tenant strict (agencyId issu des claims). Voir CLAUDE.md et ADR-0003.
+
+servers:
+  - url: http://localhost:3000
+    description: Dev local
+  - url: https://api.interim-agency.local
+    description: Staging (placeholder)
+
+tags:
+  - name: Health
+  - name: Workers
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Liveness probe
+      responses:
+        '200':
+          description: Service up
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  version: { type: string, example: 0.1.0 }
+
+  /api/v1/workers:
+    post:
+      tags: [Workers]
+      summary: Enregistrer un intérimaire
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterWorker' }
+      responses:
+        '201':
+          description: Créé
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  workerId: { type: string }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: AVS déjà utilisé dans l'agence
+    get:
+      tags: [Workers]
+      summary: Lister les intérimaires (paginé par cursor)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: query, name: search, schema: { type: string } }
+        - { in: query, name: includeArchived, schema: { type: string, enum: [true, false] } }
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 200 } }
+        - { in: query, name: cursor, schema: { type: string } }
+      responses:
+        '200':
+          description: Page
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/WorkerDetail' }
+                  nextCursor:
+                    type: string
+                    nullable: true
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/v1/workers/{id}:
+    get:
+      tags: [Workers]
+      summary: Lire un intérimaire
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Worker
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkerDetail' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Workers]
+      summary: Modifier un intérimaire (champs modifiables)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateWorker' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkerDetail' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Workers]
+      summary: Archiver (soft delete) un intérimaire
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        '204': { description: Archivé }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    RegisterWorker:
+      type: object
+      required: [firstName, lastName, avs, iban, residenceCanton]
+      properties:
+        firstName: { type: string, maxLength: 80 }
+        lastName: { type: string, maxLength: 80 }
+        avs: { type: string, example: '756.1234.5678.97' }
+        iban: { type: string, example: 'CH9300762011623852957' }
+        residenceCanton: { type: string, minLength: 2, maxLength: 2, example: GE }
+        email: { type: string, format: email }
+        phone: { type: string, example: '+41780000001' }
+
+    UpdateWorker:
+      type: object
+      properties:
+        firstName: { type: string, maxLength: 80 }
+        lastName: { type: string, maxLength: 80 }
+        iban: { type: string }
+        residenceCanton: { type: string, minLength: 2, maxLength: 2 }
+        email:
+          oneOf:
+            - { type: string, format: email }
+            - { type: string, nullable: true }
+        phone:
+          oneOf:
+            - { type: string }
+            - { type: string, nullable: true }
+
+    WorkerDetail:
+      type: object
+      required:
+        [id, agencyId, firstName, lastName, avs, iban, residenceCanton, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        agencyId: { type: string }
+        firstName: { type: string }
+        lastName: { type: string }
+        avs: { type: string }
+        iban: { type: string }
+        residenceCanton: { type: string }
+        email: { type: string, nullable: true }
+        phone: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        archivedAt: { type: string, format: date-time, nullable: true }
+
+  responses:
+    ValidationError:
+      description: Payload invalide
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error: { type: string, example: validation_error }
+    Unauthorized:
+      description: Token manquant ou invalide
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error: { type: string, example: missing_bearer_token }
+    Forbidden:
+      description: Rôle insuffisant
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error: { type: string, example: forbidden }
+    NotFound:
+      description: Ressource introuvable dans le tenant courant
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error: { type: string, example: not_found }

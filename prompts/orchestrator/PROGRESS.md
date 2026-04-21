@@ -1,19 +1,19 @@
 # PROGRESS.md — État d'avancement du projet
 
-> **Dernière mise à jour** : 2026-04-21 21:30 — ADR-0002 GCP + ADR-0003 Firebase + code auth. BLOCKER-003 et BLOCKER-004 levés côté décision/code. Provisioning effectif reste humain.
+> **Dernière mise à jour** : 2026-04-21 22:30 — A1.1 worker entity CRUD complet. 101 tests verts.
 > **Source de vérité** pour l'orchestrateur. **Ne jamais** le mettre à jour à la main sans avoir suivi le protocole `ORCHESTRATOR.md`.
 
 ---
 
 ## 0. Instantané
 
-- **Sprint courant** : A.0 (4/6 + scaffolding A0.6 sous session déblocage ; A0.4 = provisioning humain)
-- **Phase** : fondations prêtes, sprint A.1 débloqué (auth stubbable, tenant middleware, schema Prisma, CI verte, docker-compose)
-- **Prochain prompt** : `A1.1-worker-entity-crud`
-- **Prompts complétés** : 4 / 53
+- **Sprint courant** : A.1 (1/7 prompts complétés)
+- **Phase** : première entité métier complète, architecture hexagonale validée de bout en bout
+- **Prochain prompt** : `A1.2-worker-documents-upload`
+- **Prompts complétés** : 5 / 53
 - **Prompts détaillés prêts à exécuter** : 48 sprint + 5 OPS = **53/53** 🎉
 - **Blockers ouverts** : 2 (BLOCKER-001 sandbox MP, BLOCKER-002 autorisation LSE — externes, non-dev)
-- **Dette technique** : 16 tickets (voir §5)
+- **Dette technique** : 19 tickets (voir §5)
 - **Vélocité observée** : — (premier prompt tout juste fini)
 - **Skills disponibles** : 32 (voir `skills/README.md`)
 - **Documents de référence** : 10 (brief, spec, plan, archi, risques, rôles, registre nLPD, pr-template, ADR-0001, skills README)
@@ -30,6 +30,7 @@
 | `A0.2-docker-compose-local` | A.0 | 2026-04-21 | [PR #2](https://github.com/kreuille/interim-agency-system/pull/2) ✅ merged | `3c36bd5` | docker-compose + Makefile + mock MP + smoke test ; stack up en 13 s |
 | `A0.3-ci-github-actions` | A.0 | 2026-04-21 | [PR #3](https://github.com/kreuille/interim-agency-system/pull/3) ✅ merged | `7e335e3` | 3 workflows (ci, trivy, release) + dependabot + CODEOWNERS + PR template ; CI verte sur PR #3 elle-même |
 | `A0.5-prisma-schema-v0` | A.0 | 2026-04-21 | [PR #17](https://github.com/kreuille/interim-agency-system/pull/17) ✅ merged | `7c0ac23` | 18 modèles + 13 enums + migration initiale appliquée + seed idempotent + tenant middleware testé |
+| `A1.1-worker-entity-crud` | A.1 | 2026-04-21 | `feat/A1.1-worker-entity-crud` | (à pousser) | VOs (Avs/Iban/Canton/Name/Email/Phone) + entité TempWorker + 5 use cases + Prisma repo + REST + OpenAPI + audit log ; 101 tests verts |
 
 ### 🟡 In progress
 
@@ -43,10 +44,9 @@
 
 | Ordre | Prompt | Sprint | Effort | BlockedBy | Notes |
 |-------|--------|--------|--------|-----------|-------|
-| 1 | `A1.1-worker-entity-crud` | A.1 | L | A0.5 ✅ | **Prêt à lancer** — auth middleware stubbable |
+| 1 | `A1.2-worker-documents-upload` | A.1 | L | A1.1 ✅ | **Prêt à lancer** — wire storage CMEK attend DETTE-015 |
 | 2 | `A0.4-hosting-ch-provisioning` | A.0 | L | DETTE-015 | Action humaine fondateur (provisioning GCP selon ADR-0002) |
 | 3 | `A0.6-auth-firebase-setup` (côté tenant) | A.0 | S | DETTE-014 | Action humaine fondateur (création projets Firebase selon `docs/firebase-setup.md`) |
-| 7 | `A1.1-worker-entity-crud` | A.1 | L | A0.5 | |
 | 8 | `A1.2-worker-documents-upload` | A.1 | L | A1.1 | Chiffrement CMEK |
 | 9 | `A1.3-document-expiry-alerts` | A.1 | M | A1.2 | |
 | 10 | `A1.4-client-entity-crud` | A.1 | M | A0.5 | |
@@ -188,6 +188,9 @@ Décisions prises et non renégociables sans ADR. Mettre à jour au fil de l'eau
 | DETTE-014 | 2026-04-21 | déblocage | Créer projets Firebase `interim-agency-system` + `-staging` selon `docs/firebase-setup.md` | H | S1 |
 | DETTE-015 | 2026-04-21 | déblocage | Provisionner GCP `europe-west6` (Cloud SQL, Memorystore, Cloud Storage, Secret Manager, OIDC WIF) selon ADR-0002 | H | S2 |
 | DETTE-016 | 2026-04-21 | déblocage | Cloud Function `onCreate` qui pose les custom claims `agencyId` + `role` à l'inscription | M | A1.7 |
+| DETTE-017 | 2026-04-21 | A1.1 | `Idempotency-Key` cache inbound pour POST/PUT workers (retry-safety) | M | A2 |
+| DETTE-018 | 2026-04-21 | A1.1 | Mesurer la couverture CI (`vitest --coverage`) + enforcement seuils CLAUDE.md §2.3 | M | A1.2 |
+| DETTE-019 | 2026-04-21 | A1.1 | Prisma middleware tenant-injection (`where: { agencyId }` auto) — complète DETTE-010 | H | A1.4 |
 
 ---
 

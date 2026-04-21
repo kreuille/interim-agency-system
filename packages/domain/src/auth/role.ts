@@ -15,6 +15,7 @@ export const MFA_REQUIRED_ROLES: ReadonlySet<Role> = new Set(['agency_admin', 'p
 export type Action =
   | 'worker:read'
   | 'worker:write'
+  | 'worker:delete'
   | 'client:read'
   | 'client:write'
   | 'payroll:read'
@@ -30,6 +31,7 @@ const RBAC_MATRIX: Readonly<Record<Role, ReadonlySet<Action>>> = {
   agency_admin: new Set<Action>([
     'worker:read',
     'worker:write',
+    'worker:delete',
     'client:read',
     'client:write',
     'payroll:read',
@@ -50,8 +52,20 @@ const RBAC_MATRIX: Readonly<Record<Role, ReadonlySet<Action>>> = {
     'invoice:write',
     'audit:read',
   ]),
-  dispatcher: new Set<Action>(['worker:read', 'client:read', 'proposal:read', 'proposal:write']),
-  hr: new Set<Action>(['worker:read', 'worker:write', 'client:read', 'audit:read']),
+  dispatcher: new Set<Action>([
+    'worker:read',
+    'worker:write',
+    'client:read',
+    'proposal:read',
+    'proposal:write',
+  ]),
+  hr: new Set<Action>([
+    'worker:read',
+    'worker:write',
+    'worker:delete',
+    'client:read',
+    'audit:read',
+  ]),
   sales: new Set<Action>(['client:read', 'client:write', 'invoice:read', 'proposal:read']),
   viewer: new Set<Action>([
     'worker:read',
