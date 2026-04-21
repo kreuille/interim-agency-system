@@ -52,7 +52,7 @@ Apps :
 
 Docs : ADR-0001 et pr-template.md déjà présents depuis le bootstrap.
 
-PR : à ouvrir manuellement par l'utilisateur (repo GitHub pas encore créé — le prompt A0.1 mentionne `gh repo create` mais ceci relève d'une action humaine, non scriptable sans credentials). Commit local poussé sur branche dédiée.
+PR : [kreuille/interim-agency-system#1](https://github.com/kreuille/interim-agency-system/pull/1) ouverte sur `main` avec le pr-template rempli (DoD cochée, impact conformité/sécurité documenté). Remote `origin` configuré, `main` + `feat/A0.1-init-monorepo` poussées.
 
 ### Décisions
 
