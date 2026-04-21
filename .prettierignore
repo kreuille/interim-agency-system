@@ -1,0 +1,15 @@
+node_modules
+dist
+build
+coverage
+.next
+.turbo
+pnpm-lock.yaml
+*.tsbuildinfo
+
+# Documentation métier / prompts / skills — rédaction libre, pas de reformatage auto
+docs/
+prompts/
+skills/
+CLAUDE.md
+README.md

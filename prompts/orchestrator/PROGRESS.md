@@ -1,20 +1,20 @@
 # PROGRESS.md — État d'avancement du projet
 
-> **Dernière mise à jour** : 2026-04-21 — bootstrap complet (passes 1 + 2 + 3 effectuées en Cowork)
+> **Dernière mise à jour** : 2026-04-21 19:40 — A0.1 complété, monorepo pnpm fonctionnel
 > **Source de vérité** pour l'orchestrateur. **Ne jamais** le mettre à jour à la main sans avoir suivi le protocole `ORCHESTRATOR.md`.
 
 ---
 
 ## 0. Instantané
 
-- **Sprint courant** : pré-A.0 (bootstrap documentation terminé)
-- **Phase** : setup projet terminé, prêt pour validation fondateur puis démarrage dev A.0
-- **Prochain prompt** : `A0.1-init-monorepo` — fichier détaillé prêt, session Claude Code dédiée à lancer
-- **Prompts complétés** : 0 / 53 (48 sprint + 5 OPS transversal)
+- **Sprint courant** : A.0 (en cours — 1/6 prompts complétés)
+- **Phase** : dev actif, monorepo posé
+- **Prochain prompt** : `A0.2-docker-compose-local`
+- **Prompts complétés** : 1 / 53 (48 sprint + 5 OPS transversal)
 - **Prompts détaillés prêts à exécuter** : 48 sprint + 5 OPS = **53/53** 🎉
 - **Blockers ouverts** : 2 (voir §4)
-- **Dette technique** : 0 ticket
-- **Vélocité observée** : — (projet au démarrage)
+- **Dette technique** : 4 tickets (voir §5)
+- **Vélocité observée** : — (premier prompt tout juste fini)
 - **Skills disponibles** : 32 (voir `skills/README.md`)
 - **Documents de référence** : 10 (brief, spec, plan, archi, risques, rôles, registre nLPD, pr-template, ADR-0001, skills README)
 
@@ -24,7 +24,9 @@
 
 ### ✅ Completed
 
-*(aucun pour l'instant — projet en bootstrap)*
+| Prompt | Sprint | Complété le | Branche / PR | Commit | Notes |
+|--------|--------|-------------|--------------|--------|-------|
+| `A0.1-init-monorepo` | A.0 | 2026-04-21 | `feat/A0.1-init-monorepo` | (à pousser) | Monorepo pnpm + 4 packages + 4 apps + 15 tests verts |
 
 ### 🟡 In progress
 
@@ -38,12 +40,11 @@
 
 | Ordre | Prompt | Sprint | Effort | BlockedBy | Notes |
 |-------|--------|--------|--------|-----------|-------|
-| 1 | `A0.1-init-monorepo` | A.0 | M | — | Prêt à lancer |
-| 2 | `A0.2-docker-compose-local` | A.0 | S | A0.1 | |
-| 3 | `A0.3-ci-github-actions` | A.0 | M | A0.1 | |
-| 4 | `A0.4-hosting-ch-provisioning` | A.0 | L | — | Parallèle A0.1 — nécessite commande Infomaniak/Exoscale |
-| 5 | `A0.5-prisma-schema-v0` | A.0 | M | A0.1 | Entités §4.1 brief |
-| 6 | `A0.6-auth-firebase-setup` | A.0 | M | A0.1 | MFA obligatoire |
+| 1 | `A0.2-docker-compose-local` | A.0 | S | A0.1 ✅ | **Prêt à lancer** |
+| 2 | `A0.3-ci-github-actions` | A.0 | M | A0.1 ✅ | |
+| 3 | `A0.4-hosting-ch-provisioning` | A.0 | L | — | Parallèle A0.1 — nécessite commande Infomaniak/Exoscale |
+| 4 | `A0.5-prisma-schema-v0` | A.0 | M | A0.1 ✅ | Entités §4.1 brief |
+| 5 | `A0.6-auth-firebase-setup` | A.0 | M | A0.1 ✅ | MFA obligatoire |
 | 7 | `A1.1-worker-entity-crud` | A.1 | L | A0.5 | |
 | 8 | `A1.2-worker-documents-upload` | A.1 | L | A1.1 | Chiffrement CMEK |
 | 9 | `A1.3-document-expiry-alerts` | A.1 | M | A1.2 | |
@@ -97,7 +98,7 @@
 
 | Sprint | Début planifié | Fin planifiée | Prompts totaux | Complétés | Statut |
 |--------|----------------|---------------|----------------|-----------|--------|
-| A.0 | S1 | S1 | 6 | 0 | 🔵 À démarrer |
+| A.0 | S1 | S1 | 6 | 1 | 🟡 En cours |
 | A.1 | S2 | S3 | 7 | 0 | 🔵 |
 | A.2 | S4 | S5 | 6 | 0 | 🔵 |
 | A.3 | S6 | S7 | 6 | 0 | 🔵 |
@@ -113,11 +114,14 @@ Décisions prises et non renégociables sans ADR. Mettre à jour au fil de l'eau
 
 | Date | Décision | ADR | Prise par |
 |------|----------|-----|-----------|
-| 2026-04-21 | Stack Node.js 20 + TS strict + PostgreSQL 16 + Next.js 14 | ADR-0001 (à créer A0.1) | Brief |
+| 2026-04-21 | Stack Node.js 20 + TS strict + PostgreSQL 16 + Next.js 14 | `docs/adr/0001-stack-choice.md` | Brief |
 | 2026-04-21 | Hébergement Suisse obligatoire (Infomaniak ou Exoscale) | ADR-0002 (à créer A0.4) | Brief |
 | 2026-04-21 | Architecture hexagonale | `CLAUDE.md §2.2` | Lead tech |
-| 2026-04-21 | Montants en Rappen (bigint) | `CLAUDE.md §3.1` | Brief + spec MP |
-| 2026-04-21 | Orchestrateur de prompts Markdown (ce document) | ADR-0003 (à créer A0.1) | PO + fondateur |
+| 2026-04-21 | Montants en Rappen (bigint), `Currency = 'CHF' \| 'EUR'` | `CLAUDE.md §3.1` + Money.ts | Brief + spec MP |
+| 2026-04-21 | Orchestrateur de prompts Markdown (ce document) | ADR-0003 (à créer) | PO + fondateur |
+| 2026-04-21 | Packages exportent `.ts` direct (pas de compile intermédiaire) | A0.1 SESSION-LOG | A0.1 |
+| 2026-04-21 | Pas de `composite: true` ni project refs à ce stade | A0.1 SESSION-LOG | A0.1 |
+| 2026-04-21 | `docs/`, `prompts/`, `skills/`, CLAUDE.md, README.md exclus de Prettier | `.prettierignore` | A0.1 |
 
 ---
 
@@ -145,11 +149,12 @@ Décisions prises et non renégociables sans ADR. Mettre à jour au fil de l'eau
 
 ## 5. Dettes techniques qualifiées (TODO trackés)
 
-*(vide au démarrage — à alimenter au fil des prompts)*
-
-Format attendu :
 | ID | Ouverte le | Prompt déclencheur | Description | Priorité | ETA |
 |----|-----------|-------------------|-------------|----------|-----|
+| DETTE-001 | 2026-04-21 | A0.1 | Réintroduire `composite: true` + project refs quand un vrai cas de build compilé apparaît (prod Docker image api) | M | A0.3 |
+| DETTE-002 | 2026-04-21 | A0.1 | Créer repo GitHub, pousser la branche et ouvrir la PR — action humaine | H | S1 |
+| DETTE-003 | 2026-04-21 | A0.1 | Décider si on approuve les scripts postinstall esbuild via `pnpm approve-builds` dans CI | L | A0.3 |
+| DETTE-004 | 2026-04-21 | A0.1 | Renforcer le hook pré-commit avec `typecheck` incremental une fois composite en place | L | A0.3 |
 
 ---
 

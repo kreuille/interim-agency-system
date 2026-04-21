@@ -5,6 +5,83 @@
 
 ---
 
+## Session 2026-04-21 19:30 — Prompt A0.1 init monorepo
+
+- **Opérateur** : Claude Code (Opus 4.7) — déclencheur : user
+- **Prompt exécuté** : `A0.1-init-monorepo`
+- **Sprint** : A.0
+- **Branche Git** : `feat/A0.1-init-monorepo`
+- **Skills chargées** : `skills/dev/backend-node/SKILL.md`, `skills/dev/devops-swiss/SKILL.md`, `skills/ops/project-kickoff/SKILL.md`
+- **Dépendances vérifiées** : aucune (prompt racine, pas de blockedBy)
+- **Objectif de la session** : poser le monorepo pnpm fonctionnel (apps + packages), toolchain TypeScript strict, ESLint/Prettier, tests dummy verts.
+
+### Déroulé
+
+1. Création branche `feat/A0.1-init-monorepo` depuis `main`.
+2. Fichiers racine : `.nvmrc` (node 20), `.editorconfig`, `.gitignore`, `.npmrc`, `.prettierignore`, `pnpm-workspace.yaml`, `tsconfig.base.json`, `tsconfig.json`, `prettier.config.mjs`, `eslint.config.mjs` (flat config v9 type-aware), `package.json` root avec scripts `build/dev/typecheck/lint/test/format`.
+3. Packages posés : `@interim/shared` (Money, WeekIso, Result, Clock), `@interim/domain` (shared/ids avec brands Uuid/AgencyId/StaffId), `@interim/application` (squelette), `@interim/contracts` (squelette).
+4. Apps posées : `@interim/api` (Express + endpoint `/health`), `@interim/web-admin` (Next.js 14 App Router), `@interim/web-portal` (Next.js 14 App Router), `@interim/worker` (placeholder BullMQ).
+5. Tests dummy : 6 Money + 4 WeekIso + 4 Ids + 1 Supertest /health = **15 tests verts**.
+6. Hook Husky `pre-commit` → `lint-staged`.
+7. `pnpm install` OK en **~60s** (429 packages).
+8. Fix itération 1 : tsconfig de chaque workspace inclut les tests pour le type-aware linting (suppression composite/references qui n'étaient pas nécessaires à ce stade ; sera réintroduit au besoin en sprint ultérieur).
+9. Fix itération 2 : `Currency` type élargi à `'CHF' | 'EUR'` pour garder un vrai check d'invariant runtime (sinon `@typescript-eslint/no-unnecessary-condition` flaguait) ; `process.env.PORT`/`VERSION` en dot notation ; directives `eslint-disable-next-line` inutiles supprimées.
+10. `.prettierignore` : `docs/`, `prompts/`, `skills/`, `CLAUDE.md`, `README.md` ignorés (rédaction libre FR, pas de reformat auto).
+11. `pnpm format` → 2 fichiers reformatés (`package.json`, `week-iso.ts`).
+12. DoD validée : `pnpm typecheck` ✓, `pnpm lint` ✓, `pnpm test` ✓ (15/15), `pnpm format:check` ✓.
+
+### Livrables
+
+Fichiers racine :
+- `.nvmrc`, `.editorconfig`, `.gitignore`, `.npmrc`, `.prettierignore`
+- `pnpm-workspace.yaml`, `package.json`, `tsconfig.base.json`, `tsconfig.json`
+- `eslint.config.mjs`, `prettier.config.mjs`
+- `.husky/pre-commit`
+
+Packages :
+- `packages/shared/src/{money,week-iso,result,clock}.ts` + tests pour money et week-iso
+- `packages/domain/src/shared/ids.ts` + tests
+- `packages/application/src/index.ts` (squelette)
+- `packages/contracts/src/index.ts` (squelette)
+
+Apps :
+- `apps/api/src/{app,main}.ts` + `main.test.ts`
+- `apps/web-admin/{app/layout.tsx, app/page.tsx, next.config.mjs, next-env.d.ts}`
+- `apps/web-portal/{app/layout.tsx, app/page.tsx, next.config.mjs, next-env.d.ts}`
+- `apps/worker/src/main.ts`
+
+Docs : ADR-0001 et pr-template.md déjà présents depuis le bootstrap.
+
+PR : à ouvrir manuellement par l'utilisateur (repo GitHub pas encore créé — le prompt A0.1 mentionne `gh repo create` mais ceci relève d'une action humaine, non scriptable sans credentials). Commit local poussé sur branche dédiée.
+
+### Décisions
+
+1. **Pas de `composite: true` ni project references à ce stade** — raison : `tsc -b` avec refs composite génère du `dist/` et complexifie le typecheck quand on inclut les tests. On garde un `tsconfig.json` simple par workspace qui inclut `src/**/*.ts` + `vitest.config.ts` pour activer le type-aware linting ESLint. Alternative rejetée : deux tsconfig par workspace (build vs lint) — trop de cérémonie pour zéro bénéfice actuel. À revisiter si on ajoute de vraies cibles de build.
+2. **`Currency = 'CHF' | 'EUR'`** (et non juste `'CHF'`) — raison : garder un invariant runtime `assertSameCurrency` vérifiable sans que l'ESLint rule `no-unnecessary-condition` râle. L'EUR sera probablement utile pour les intérimaires frontaliers FR/DE de toute façon.
+3. **Monorepo pnpm, packages exportent `.ts` (pas `.js` compilé)** — raison : zéro build step intermédiaire pour les imports inter-workspaces ; `tsx` (api, worker) et Next.js (web-admin, portal) résolvent les sources TS directement. Production build sera traité par app (bundler ou `tsc -b` tardif) au fil des sprints.
+4. **`docs/`, `prompts/`, `skills/`, `CLAUDE.md`, `README.md` exclus de Prettier** — raison : contenu rédactionnel FR à forte variance de style (tableaux, code blocks en français, lignes longues intentionnelles). Les formatter casserait la lisibilité métier.
+5. **Hook husky minimaliste** (`pnpm exec lint-staged`) — raison : MVP suffisant ; `pnpm typecheck` incremental sera ajouté quand `tsc -b` composite sera en place.
+
+### Dettes ouvertes
+
+- [ ] Revenir sur `composite: true` + project references quand on aura un premier vrai cas de build compilé (probablement A0.3 — CI Docker image pour `apps/api`).
+- [ ] Créer le repo GitHub `gh repo create` et pousser la branche + ouvrir la PR — action humaine (fondateur). Commande suggérée : `gh repo create {org}/interim-agency-system --private --source=. --push`.
+- [ ] Pentests, coverage, Dependabot, Trivy → sprint A0.3 (`ci-github-actions`).
+- [ ] Audit `pnpm approve-builds` (esbuild) à trancher en A0.3 (décision CI : on approuve ou pas les scripts postinstall).
+
+### Prochain prompt suggéré
+
+- `A0.2-docker-compose-local` (Postgres 16, Redis, MailHog, Swagger UI) — bloqué uniquement par A0.1, maintenant `completed`. Taille S, idéal pour la prochaine session.
+
+### Métriques
+
+- Fichiers créés/modifiés dans ce prompt : 34 (hors node_modules et pnpm-lock).
+- Dépendances installées : 429 packages (~60 s).
+- Tests : 15 passing / 4 fichiers / 4 packages.
+- Durée session : ~20 min hors téléchargement deps.
+
+---
+
 ## Session 2026-04-21 16:30 — Rédaction complète passes 2 et 3
 
 - **Opérateur** : Claude (Cowork mode) — déclencheur : demande fondateur "fais tout étape par étape et finis par les skills"
