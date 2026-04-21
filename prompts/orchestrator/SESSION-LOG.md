@@ -5,6 +5,73 @@
 
 ---
 
+## Session 2026-04-21 20:55 — Prompt A0.5 Prisma schema v0
+
+- **Opérateur** : Claude Code (Opus 4.7) — déclencheur : user (mode autonome)
+- **Prompt** : `A0.5-prisma-schema-v0`
+- **Sprint** : A.0
+- **Branche** : `feat/A0.5-prisma-schema-v0`
+- **Dépendances** : A0.1 ✅, A0.2 ✅ (Postgres local), A0.3 ✅ (CI qui re-validera)
+- **Objectif** : schéma Prisma complet (toutes les entités §4.1 brief), migration initiale générée + appliquée, seed minimal, tenant middleware testé.
+
+### Déroulé
+
+1. `apps/api/prisma/schema.prisma` : 18 modèles + 13 enums. Toutes tables ont `agencyId`, `createdAt`, `updatedAt`, index composites. Montants en `BigInt` (Rappen). Relations FK `onDelete: Restrict` pour données légales. Énumérations pour tous les statuts.
+2. `apps/api/prisma/seed.ts` : idempotent (upsert agency/workers/client/contract, findFirst/create pour rate card). 1 agence Pilote SA, 2 intérimaires (Jean Dupont GE, Marie Martin VD), 1 client MovePlanner SA, 1 contrat cadre MP-2026-001, 1 rate card Déménageur.
+3. `apps/api/src/infrastructure/db/prisma.ts` : factory `createPrismaClient()` avec log scope par NODE_ENV.
+4. `apps/api/src/shared/context/tenant-context.ts` : AsyncLocalStorage typé ; `runWithTenant`, `currentTenant`, `tryCurrentTenant`. 4 tests (throw sans contexte, exposition, isolation concurrente, try).
+5. `apps/api/src/shared/middleware/tenant.middleware.ts` : Express middleware qui lit `req.user.agencyId`, wrappe le reste de la chaîne dans `runWithTenant`. 3 tests (401 sans user, 200 avec, isolation concurrente). Augmentation `namespace Express { interface Request { user?: AuthenticatedUser } }` (global, pas de module externe).
+6. Install Prisma 5.22 + `@prisma/client` — ajouté `pnpm.onlyBuiltDependencies` pour esbuild/prisma afin que les postinstall scripts tournent (DETTE-003 partiellement résolue).
+7. `DATABASE_URL=postgresql://dev:dev@localhost:5432/interim_dev?schema=public` → `prisma migrate dev --name init` ✓ (migration `20260421180913_init`).
+8. Seed lancé contre la DB locale : 1 agence + 2 workers + 1 client + 1 rate card créés (idempotent, upsert).
+9. Fix lint 1 : `tenant.middleware.ts` augmentation via `namespace Express` global (résout `@types/express-serve-static-core` introuvable).
+10. Fix lint 2 : `exactOptionalPropertyTypes` strict → spread conditionnel `...(x !== undefined ? { field: x } : {})` à la place de `field: x ?? undefined`.
+11. Fix lint 3 : `seed.ts` inclus dans `tsconfig.json` (`prisma/**/*.ts`), catch Promise typé `(error: unknown)`.
+12. DoD validée : typecheck ✓, lint ✓, format:check ✓, test ✓ **26/26** (6 mock + 10 shared + 4 domain + 8 api : 1 health + 4 tenant-context + 3 tenant-middleware).
+
+### Livrables
+
+- `apps/api/prisma/schema.prisma` (18 modèles, 13 enums)
+- `apps/api/prisma/migrations/20260421180913_init/migration.sql`
+- `apps/api/prisma/seed.ts`
+- `apps/api/src/infrastructure/db/prisma.ts`
+- `apps/api/src/shared/context/tenant-context.ts` + test
+- `apps/api/src/shared/middleware/tenant.middleware.ts` + test
+- `apps/api/package.json` : scripts `prisma:generate`, `prisma:migrate`, `prisma:seed`, `db:reset`
+- `package.json` racine : `pnpm.onlyBuiltDependencies` (esbuild, prisma)
+
+### Décisions
+
+1. **Augmentation Express via `namespace Express` globale** — raison : le chemin `express-serve-static-core` échoue en strict parce que ses types sont transitive et pas toujours résolvables ; la forme globale `namespace Express { interface Request }` est le pattern canonique recommandé par @types/express.
+2. **`exactOptionalPropertyTypes: true` gardé malgré la contrainte** — raison : évite les bugs subtils où `undefined` explicite passe pour "absent". Coût : spread conditionnel. Gain : le type-system garantit qu'on ne confond pas les deux.
+3. **Seed idempotent (upsert/findFirst + create)** — raison : permet `pnpm --filter @interim/api prisma:seed` répété sans casser la DB. La RateCard upsert sur id composite a échoué (UUID malformé) → fallback findFirst + create.
+4. **`pnpm.onlyBuiltDependencies` pour esbuild + prisma** — raison : postinstall scripts nécessaires (generate du binaire natif) ; pnpm v10 les bloque par défaut pour sécurité. Liste explicite = whitelist auditée.
+5. **Pas d'auth wiring concret** — raison : `tenantMiddleware` attend `req.user` posé en amont ; le middleware d'auth (JWT Firebase) arrive en A0.6 (différé BLOCKER-004). Le pattern est prêt, il suffira de brancher.
+
+### Dettes ouvertes (nouvelles)
+
+- [ ] DETTE-010 : wrapper Prisma avec middleware qui injecte `where: { agencyId }` sur toute query (CLAUDE.md §3.5). À faire avant A1.1.
+- [ ] DETTE-011 : tests d'intégration Prisma (Testcontainers Postgres) vérifiant isolation cross-tenant réelle. À faire avant A1.1.
+- [ ] DETTE-012 : ajouter un container `api` dans docker-compose pour test E2E complet webhook → api → db (bouge DETTE-005 d'un cran).
+
+### Prochain prompt suggéré
+
+- **Fin sprint A.0** : A0.4 (hosting) et A0.6 (auth) bloqués externe. Je m'arrête ici — le fondateur doit :
+  1. Créer le tenant Firebase ou Supabase (BLOCKER-004) + ADR-0003
+  2. Commander l'hébergement Infomaniak/Exoscale (BLOCKER-003) + ADR-0002
+  3. Appliquer branch protection sur main (DETTE-007)
+- Dès que BLOCKER-004 levé, reprendre avec `A0.6-auth-firebase-setup` puis sprint A.1 (`A1.1-worker-entity-crud`).
+
+### Métriques
+
+- Fichiers créés : 8 (schema + migration + seed + 4 src + prisma factory)
+- Lignes schema.prisma : 480
+- Entités modélisées : 18 (tous les modèles §4.1 brief + idempotence webhooks)
+- Tests nouveaux : 7 (4 tenant-context + 3 tenant-middleware)
+- Total tests repo : **26** (vs 19 avant A0.5)
+
+---
+
 ## Session 2026-04-21 20:25 — Prompt A0.3 CI GitHub Actions
 
 - **Opérateur** : Claude Code (Opus 4.7) — déclencheur : user (mode autonome)

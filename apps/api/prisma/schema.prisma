@@ -1,0 +1,610 @@
+// Schéma Prisma v0 — agence d'intérim (multi-tenant, Rappen, conformité CH)
+// Toutes les tables portent `agency_id` pour isolation stricte. Les montants
+// sont stockés en `BigInt` (Rappen). Les dates en `DateTime` (UTC).
+// Voir CLAUDE.md §3 pour les invariants métier.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// Enums
+// ============================================================================
+
+enum EmploymentType {
+  TEMP_WORKER
+  FIXED_TERM
+}
+
+enum WorkerDocumentType {
+  WORK_PERMIT
+  AVS_CARD
+  LAMAL_ATTESTATION
+  ID_CARD
+  CV
+  DIPLOMA
+  CERTIFICATION
+  OTHER
+}
+
+enum WorkerDocumentStatus {
+  VALID
+  EXPIRING_SOON
+  EXPIRED
+  MISSING
+}
+
+enum DrivingLicenseCategory {
+  B
+  C1
+  C
+  CE
+  D
+}
+
+enum AvailabilitySource {
+  WORKER_PORTAL
+  AGENCY_ADMIN
+  MOVEPLANNER_PUSH
+}
+
+enum AvailabilityStatus {
+  AVAILABLE
+  UNAVAILABLE
+  TENTATIVE
+}
+
+enum MissionProposalStatus {
+  PROPOSED
+  PASS_THROUGH_SENT
+  AGENCY_REVIEW
+  ACCEPTED
+  REFUSED
+  TIMEOUT
+  EXPIRED
+}
+
+enum MissionProposalRoutingMode {
+  PASS_THROUGH
+  AGENCY_CONTROLLED
+}
+
+enum MissionContractStatus {
+  DRAFT
+  SENT_FOR_SIGNATURE
+  SIGNED
+  CANCELLED
+}
+
+enum TimesheetStatus {
+  RECEIVED
+  UNDER_REVIEW
+  SIGNED
+  DISPUTED
+  TACIT_APPROVED
+}
+
+enum PayslipStatus {
+  DRAFT
+  FINALIZED
+  PAID
+  CANCELLED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  SENT
+  PAID
+  OVERDUE
+  DISPUTED
+  CANCELLED
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  SIGN
+  APPROVE
+  REJECT
+  EMIT
+  RECEIVE
+}
+
+enum LseAuthorizationStatus {
+  PENDING
+  ACTIVE
+  EXPIRED
+  REVOKED
+}
+
+enum InboundWebhookStatus {
+  PENDING
+  PROCESSING
+  PROCESSED
+  FAILED
+  SKIPPED_DUPLICATE
+}
+
+enum OutboundIdempotencyStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+}
+
+// ============================================================================
+// Agency (tenant root)
+// ============================================================================
+
+model Agency {
+  id        String   @id @default(uuid()) @db.Uuid
+  legalName String
+  ideNumber String   @unique
+  canton    String   @db.Char(2)
+  iban      String?
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  workers          TempWorker[]
+  clients          Client[]
+  authorizations   LseAuthorization[]
+  missionContracts MissionContract[]
+  missionProposals MissionProposal[]
+  timesheets       Timesheet[]
+  payslips         Payslip[]
+  invoices         Invoice[]
+  auditLogs        AuditLogEntry[]
+  rateCards        RateCard[]
+
+  @@map("agencies")
+}
+
+// ============================================================================
+// LSE authorization (par canton, obligatoire pour exploitation)
+// ============================================================================
+
+model LseAuthorization {
+  id             String                 @id @default(uuid()) @db.Uuid
+  agencyId       String                 @db.Uuid
+  canton         String                 @db.Char(2)
+  authorityName  String
+  authNumber     String
+  status         LseAuthorizationStatus @default(PENDING)
+  grantedAt      DateTime?              @db.Timestamptz(6)
+  expiresAt      DateTime?              @db.Timestamptz(6)
+  bondAmountRappen BigInt?
+  createdAt      DateTime               @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime               @updatedAt @db.Timestamptz(6)
+
+  agency Agency @relation(fields: [agencyId], references: [id], onDelete: Restrict)
+
+  @@unique([agencyId, canton])
+  @@index([agencyId, status])
+  @@map("lse_authorizations")
+}
+
+// ============================================================================
+// Intérimaires
+// ============================================================================
+
+model TempWorker {
+  id              String         @id @default(uuid()) @db.Uuid
+  agencyId        String         @db.Uuid
+  firstName       String
+  lastName        String
+  dateOfBirth     DateTime?      @db.Date
+  avs             String
+  iban            String
+  residenceCanton String         @db.Char(2)
+  addressLine1    String?
+  addressLine2    String?
+  zipCode         String?
+  city            String?
+  email           String?
+  phone           String?
+  employmentType  EmploymentType @default(TEMP_WORKER)
+  reliabilityScore Int?
+  notes           String?
+  archivedAt      DateTime?      @db.Timestamptz(6)
+  createdAt       DateTime       @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime       @updatedAt @db.Timestamptz(6)
+
+  agency           Agency             @relation(fields: [agencyId], references: [id], onDelete: Restrict)
+  documents        WorkerDocument[]
+  qualifications   Qualification[]
+  drivingLicenses  DrivingLicense[]
+  availabilities   WorkerAvailability[]
+  missionProposals MissionProposal[]
+  missionContracts MissionContract[]
+  timesheets       Timesheet[]
+  payslips         Payslip[]
+
+  @@unique([agencyId, avs])
+  @@index([agencyId, archivedAt])
+  @@index([agencyId, lastName, firstName])
+  @@map("temp_workers")
+}
+
+model WorkerDocument {
+  id          String               @id @default(uuid()) @db.Uuid
+  agencyId    String               @db.Uuid
+  workerId    String               @db.Uuid
+  type        WorkerDocumentType
+  status      WorkerDocumentStatus @default(VALID)
+  fileKey     String
+  mimeType    String
+  sizeBytes   Int
+  issuedAt    DateTime?            @db.Date
+  expiresAt   DateTime?            @db.Date
+  metadata    Json?
+  createdAt   DateTime             @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime             @updatedAt @db.Timestamptz(6)
+
+  worker TempWorker @relation(fields: [workerId], references: [id], onDelete: Restrict)
+
+  @@index([agencyId, workerId, type])
+  @@index([agencyId, expiresAt])
+  @@map("worker_documents")
+}
+
+model Qualification {
+  id         String   @id @default(uuid()) @db.Uuid
+  agencyId   String   @db.Uuid
+  workerId   String   @db.Uuid
+  label      String
+  specialty  String?
+  issuedAt   DateTime? @db.Date
+  expiresAt  DateTime? @db.Date
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt @db.Timestamptz(6)
+
+  worker TempWorker @relation(fields: [workerId], references: [id], onDelete: Restrict)
+
+  @@index([agencyId, workerId])
+  @@map("worker_qualifications")
+}
+
+model DrivingLicense {
+  id         String                 @id @default(uuid()) @db.Uuid
+  agencyId   String                 @db.Uuid
+  workerId   String                 @db.Uuid
+  category   DrivingLicenseCategory
+  issuedAt   DateTime               @db.Date
+  expiresAt  DateTime?              @db.Date
+  createdAt  DateTime               @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime               @updatedAt @db.Timestamptz(6)
+
+  worker TempWorker @relation(fields: [workerId], references: [id], onDelete: Restrict)
+
+  @@unique([workerId, category])
+  @@index([agencyId, workerId])
+  @@map("worker_driving_licenses")
+}
+
+// ============================================================================
+// Clients et contrats cadres
+// ============================================================================
+
+model Client {
+  id               String         @id @default(uuid()) @db.Uuid
+  agencyId         String         @db.Uuid
+  legalName        String
+  ideNumber        String?
+  billingEmail     String?
+  contactPhone     String?
+  addressLine1     String?
+  addressLine2     String?
+  zipCode          String?
+  city             String?
+  canton           String?        @db.Char(2)
+  paymentTermsDays Int            @default(30)
+  creditLimitRappen BigInt?
+  archivedAt       DateTime?      @db.Timestamptz(6)
+  createdAt        DateTime       @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime       @updatedAt @db.Timestamptz(6)
+
+  agency    Agency           @relation(fields: [agencyId], references: [id], onDelete: Restrict)
+  contracts ClientContract[]
+  rateCards RateCard[]
+  invoices  Invoice[]
+  proposals MissionProposal[]
+
+  @@unique([agencyId, ideNumber])
+  @@index([agencyId, archivedAt])
+  @@map("clients")
+}
+
+model ClientContract {
+  id                   String    @id @default(uuid()) @db.Uuid
+  agencyId             String    @db.Uuid
+  clientId             String    @db.Uuid
+  reference            String
+  branch               String
+  startDate            DateTime  @db.Date
+  endDate              DateTime? @db.Date
+  agencyCoefficient    Int
+  billingFrequencyDays Int       @default(30)
+  notes                String?
+  createdAt            DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt            DateTime  @updatedAt @db.Timestamptz(6)
+
+  client    Client     @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  rateCards RateCard[]
+
+  @@unique([agencyId, reference])
+  @@index([agencyId, clientId])
+  @@map("client_contracts")
+}
+
+model RateCard {
+  id                   String   @id @default(uuid()) @db.Uuid
+  agencyId             String   @db.Uuid
+  clientId             String   @db.Uuid
+  clientContractId     String?  @db.Uuid
+  role                 String
+  branch               String
+  hourlyRateRappen     BigInt
+  agencyCoefficient    Int
+  nightPremiumBp       Int      @default(2500)
+  sundayPremiumBp      Int      @default(5000)
+  overtimePremiumBp    Int      @default(2500)
+  validFrom            DateTime @db.Date
+  validUntil           DateTime? @db.Date
+  createdAt            DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt            DateTime @updatedAt @db.Timestamptz(6)
+
+  agency         Agency          @relation(fields: [agencyId], references: [id], onDelete: Restrict)
+  client         Client          @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  clientContract ClientContract? @relation(fields: [clientContractId], references: [id], onDelete: SetNull)
+
+  @@index([agencyId, clientId, role])
+  @@index([agencyId, validFrom, validUntil])
+  @@map("rate_cards")
+}
+
+// ============================================================================
+// Disponibilités
+// ============================================================================
+
+model WorkerAvailability {
+  id         String             @id @default(uuid()) @db.Uuid
+  agencyId   String             @db.Uuid
+  workerId   String             @db.Uuid
+  startsAt   DateTime           @db.Timestamptz(6)
+  endsAt     DateTime           @db.Timestamptz(6)
+  status     AvailabilityStatus
+  source     AvailabilitySource
+  rrule      String?
+  reason     String?
+  ttlUntil   DateTime?          @db.Timestamptz(6)
+  createdAt  DateTime           @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime           @updatedAt @db.Timestamptz(6)
+
+  worker TempWorker @relation(fields: [workerId], references: [id], onDelete: Restrict)
+
+  @@index([agencyId, workerId, startsAt])
+  @@index([agencyId, status, startsAt])
+  @@map("worker_availabilities")
+}
+
+// ============================================================================
+// Propositions de mission (webhooks MovePlanner entrants)
+// ============================================================================
+
+model MissionProposal {
+  id                  String                     @id @default(uuid()) @db.Uuid
+  agencyId            String                     @db.Uuid
+  workerId            String?                    @db.Uuid
+  clientId            String?                    @db.Uuid
+  externalRequestId   String
+  status              MissionProposalStatus      @default(PROPOSED)
+  routingMode         MissionProposalRoutingMode
+  proposedAt          DateTime                   @db.Timestamptz(6)
+  responseDeadline    DateTime?                  @db.Timestamptz(6)
+  acceptedAt          DateTime?                  @db.Timestamptz(6)
+  refusedAt           DateTime?                  @db.Timestamptz(6)
+  rawPayload          Json
+  createdAt           DateTime                   @default(now()) @db.Timestamptz(6)
+  updatedAt           DateTime                   @updatedAt @db.Timestamptz(6)
+
+  agency  Agency           @relation(fields: [agencyId], references: [id], onDelete: Restrict)
+  worker  TempWorker?      @relation(fields: [workerId], references: [id], onDelete: SetNull)
+  client  Client?          @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  contract MissionContract?
+
+  @@unique([agencyId, externalRequestId])
+  @@index([agencyId, status, proposedAt])
+  @@index([agencyId, workerId])
+  @@map("mission_proposals")
+}
+
+model MissionContract {
+  id               String                 @id @default(uuid()) @db.Uuid
+  agencyId         String                 @db.Uuid
+  workerId         String                 @db.Uuid
+  proposalId       String                 @unique @db.Uuid
+  branch           String
+  reference        String
+  status           MissionContractStatus  @default(DRAFT)
+  signedAt         DateTime?              @db.Timestamptz(6)
+  signedPdfKey     String?
+  zertesEnvelopeId String?
+  metadata         Json?
+  createdAt        DateTime               @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime               @updatedAt @db.Timestamptz(6)
+
+  agency   Agency          @relation(fields: [agencyId], references: [id], onDelete: Restrict)
+  worker   TempWorker      @relation(fields: [workerId], references: [id], onDelete: Restrict)
+  proposal MissionProposal @relation(fields: [proposalId], references: [id], onDelete: Restrict)
+
+  @@unique([agencyId, reference])
+  @@index([agencyId, workerId, signedAt])
+  @@map("mission_contracts")
+}
+
+// ============================================================================
+// Relevés d'heures et paie
+// ============================================================================
+
+model Timesheet {
+  id                 String          @id @default(uuid()) @db.Uuid
+  agencyId           String          @db.Uuid
+  workerId           String          @db.Uuid
+  externalTimesheetId String?
+  weekIso            String
+  plannedMinutes     Int             @default(0)
+  declaredMinutes    Int             @default(0)
+  status             TimesheetStatus @default(RECEIVED)
+  receivedAt         DateTime        @db.Timestamptz(6)
+  signedAt           DateTime?       @db.Timestamptz(6)
+  disputedAt         DateTime?       @db.Timestamptz(6)
+  disputeReason      String?
+  entries            Json
+  anomalies          Json?
+  createdAt          DateTime        @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime        @updatedAt @db.Timestamptz(6)
+
+  agency  Agency     @relation(fields: [agencyId], references: [id], onDelete: Restrict)
+  worker  TempWorker @relation(fields: [workerId], references: [id], onDelete: Restrict)
+  payslip Payslip?   @relation("TimesheetToPayslip")
+
+  @@unique([agencyId, externalTimesheetId])
+  @@index([agencyId, workerId, weekIso])
+  @@index([agencyId, status, receivedAt])
+  @@map("timesheets")
+}
+
+model Payslip {
+  id                   String         @id @default(uuid()) @db.Uuid
+  agencyId             String         @db.Uuid
+  workerId             String         @db.Uuid
+  timesheetId          String?        @unique @db.Uuid
+  weekIso              String
+  grossSalaryRappen    BigInt
+  netSalaryRappen      BigInt
+  employerCostRappen   BigInt
+  socialDeductions     Json
+  status               PayslipStatus  @default(DRAFT)
+  pdfKey               String?
+  elmExchangeId        String?
+  iso20022MessageId    String?
+  paidAt               DateTime?      @db.Timestamptz(6)
+  createdAt            DateTime       @default(now()) @db.Timestamptz(6)
+  updatedAt            DateTime       @updatedAt @db.Timestamptz(6)
+
+  worker    TempWorker @relation(fields: [workerId], references: [id], onDelete: Restrict)
+  agency    Agency     @relation(fields: [agencyId], references: [id], onDelete: Restrict)
+  timesheet Timesheet? @relation("TimesheetToPayslip", fields: [timesheetId], references: [id], onDelete: SetNull)
+
+  @@index([agencyId, workerId, weekIso])
+  @@index([agencyId, status, paidAt])
+  @@map("payslips")
+}
+
+// ============================================================================
+// Facturation client
+// ============================================================================
+
+model Invoice {
+  id                  String        @id @default(uuid()) @db.Uuid
+  agencyId            String        @db.Uuid
+  clientId            String        @db.Uuid
+  reference           String
+  periodStart         DateTime      @db.Date
+  periodEnd           DateTime      @db.Date
+  subTotalRappen      BigInt
+  vatBasisPoints      Int           @default(810)
+  vatAmountRappen     BigInt
+  totalAmountRappen   BigInt
+  status              InvoiceStatus @default(DRAFT)
+  dueAt               DateTime?     @db.Date
+  issuedAt            DateTime?     @db.Timestamptz(6)
+  paidAt              DateTime?     @db.Timestamptz(6)
+  pdfKey              String?
+  qrBillReference     String?
+  lines               Json
+  createdAt           DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt           DateTime      @updatedAt @db.Timestamptz(6)
+
+  agency Agency @relation(fields: [agencyId], references: [id], onDelete: Restrict)
+  client Client @relation(fields: [clientId], references: [id], onDelete: Restrict)
+
+  @@unique([agencyId, reference])
+  @@index([agencyId, clientId, periodStart])
+  @@index([agencyId, status, dueAt])
+  @@map("invoices")
+}
+
+// ============================================================================
+// Audit log (append-only, 10 ans de rétention CLAUDE.md §3.4)
+// ============================================================================
+
+model AuditLogEntry {
+  id          String      @id @default(uuid()) @db.Uuid
+  agencyId    String      @db.Uuid
+  actorId     String?
+  actorRole   String?
+  action      AuditAction
+  entityType  String
+  entityId    String
+  diff        Json?
+  ipAddress   String?
+  userAgent   String?
+  occurredAt  DateTime    @default(now()) @db.Timestamptz(6)
+
+  agency Agency @relation(fields: [agencyId], references: [id], onDelete: Restrict)
+
+  @@index([agencyId, entityType, entityId])
+  @@index([agencyId, occurredAt])
+  @@index([agencyId, actorId, occurredAt])
+  @@map("audit_logs")
+}
+
+// ============================================================================
+// Intégration MovePlanner : idempotence
+// ============================================================================
+
+model InboundWebhookEvent {
+  id             String               @id @default(uuid()) @db.Uuid
+  agencyId       String               @db.Uuid
+  eventId        String
+  eventType      String
+  signature      String
+  receivedAt     DateTime             @default(now()) @db.Timestamptz(6)
+  processedAt    DateTime?            @db.Timestamptz(6)
+  status         InboundWebhookStatus @default(PENDING)
+  payload        Json
+  headers        Json
+  errorMessage   String?
+  retryCount     Int                  @default(0)
+
+  @@unique([eventId])
+  @@index([agencyId, status, receivedAt])
+  @@index([agencyId, eventType, receivedAt])
+  @@map("inbound_webhook_events")
+}
+
+model OutboundIdempotencyKey {
+  id              String                    @id @default(uuid()) @db.Uuid
+  agencyId        String                    @db.Uuid
+  idempotencyKey  String
+  endpoint        String
+  method          String
+  requestHash     String
+  responseStatus  Int?
+  responseBody    Json?
+  status          OutboundIdempotencyStatus @default(PENDING)
+  attempts        Int                       @default(0)
+  firstAttemptAt  DateTime                  @default(now()) @db.Timestamptz(6)
+  lastAttemptAt   DateTime                  @default(now()) @db.Timestamptz(6)
+
+  @@unique([idempotencyKey])
+  @@index([agencyId, endpoint, status])
+  @@map("outbound_idempotency_keys")
+}

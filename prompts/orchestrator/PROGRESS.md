@@ -1,19 +1,19 @@
 # PROGRESS.md — État d'avancement du projet
 
-> **Dernière mise à jour** : 2026-04-21 20:40 — A0.3 complété, CI GitHub Actions posée
+> **Dernière mise à jour** : 2026-04-21 21:00 — A0.5 complété, sprint A.0 stoppé sur blockers externes (A0.4, A0.6)
 > **Source de vérité** pour l'orchestrateur. **Ne jamais** le mettre à jour à la main sans avoir suivi le protocole `ORCHESTRATOR.md`.
 
 ---
 
 ## 0. Instantané
 
-- **Sprint courant** : A.0 (en cours — 3/6 prompts complétés)
-- **Phase** : dev actif, CI posée
-- **Prochain prompt** : `A0.5-prisma-schema-v0` (A0.4 et A0.6 différés → blockers externes)
-- **Prompts complétés** : 3 / 53 (48 sprint + 5 OPS transversal)
+- **Sprint courant** : A.0 (en pause — 4/6 prompts complétés, 2 bloqués externe)
+- **Phase** : en attente actions fondateur (BLOCKER-003 hosting, BLOCKER-004 auth Firebase, DETTE-007 branch protection)
+- **Prochain prompt** : `A0.6-auth-firebase-setup` dès que BLOCKER-004 levé, sinon `A1.1-worker-entity-crud` avec auth stub
+- **Prompts complétés** : 4 / 53 (48 sprint + 5 OPS transversal)
 - **Prompts détaillés prêts à exécuter** : 48 sprint + 5 OPS = **53/53** 🎉
 - **Blockers ouverts** : 4 (voir §4)
-- **Dette technique** : 9 tickets (voir §5)
+- **Dette technique** : 12 tickets (voir §5)
 - **Vélocité observée** : — (premier prompt tout juste fini)
 - **Skills disponibles** : 32 (voir `skills/README.md`)
 - **Documents de référence** : 10 (brief, spec, plan, archi, risques, rôles, registre nLPD, pr-template, ADR-0001, skills README)
@@ -28,7 +28,8 @@
 |--------|--------|-------------|--------------|--------|-------|
 | `A0.1-init-monorepo` | A.0 | 2026-04-21 | [PR #1](https://github.com/kreuille/interim-agency-system/pull/1) ✅ merged | `0b9cd1e` | Monorepo pnpm + 4 packages + 4 apps + 15 tests verts |
 | `A0.2-docker-compose-local` | A.0 | 2026-04-21 | [PR #2](https://github.com/kreuille/interim-agency-system/pull/2) ✅ merged | `3c36bd5` | docker-compose + Makefile + mock MP + smoke test ; stack up en 13 s |
-| `A0.3-ci-github-actions` | A.0 | 2026-04-21 | `feat/A0.3-ci-github-actions` | (à pousser) | 3 workflows (ci, trivy, release) + dependabot + CODEOWNERS + PR template |
+| `A0.3-ci-github-actions` | A.0 | 2026-04-21 | [PR #3](https://github.com/kreuille/interim-agency-system/pull/3) ✅ merged | `7e335e3` | 3 workflows (ci, trivy, release) + dependabot + CODEOWNERS + PR template ; CI verte sur PR #3 elle-même |
+| `A0.5-prisma-schema-v0` | A.0 | 2026-04-21 | `feat/A0.5-prisma-schema-v0` | (à pousser) | 18 modèles + 13 enums + migration initiale appliquée + seed idempotent + tenant middleware testé |
 
 ### 🟡 In progress
 
@@ -42,9 +43,9 @@
 
 | Ordre | Prompt | Sprint | Effort | BlockedBy | Notes |
 |-------|--------|--------|--------|-----------|-------|
-| 1 | `A0.5-prisma-schema-v0` | A.0 | M | A0.1 ✅ | **Prêt à lancer** — entités §4.1 brief |
-| 2 | `A0.4-hosting-ch-provisioning` | A.0 | L | BLOCKER-003 | 🚫 Bloqué — contrats Infomaniak/Exoscale + DPA |
-| 3 | `A0.6-auth-firebase-setup` | A.0 | M | A0.1 ✅ + BLOCKER-004 | 🚫 Bloqué — tenant Firebase à créer par le fondateur |
+| 1 | `A0.4-hosting-ch-provisioning` | A.0 | L | BLOCKER-003 | 🚫 Bloqué — contrats Infomaniak/Exoscale + DPA |
+| 2 | `A0.6-auth-firebase-setup` | A.0 | M | BLOCKER-004 | 🚫 Bloqué — tenant Firebase à créer par le fondateur |
+| 3 | `A1.1-worker-entity-crud` | A.1 | L | A0.5 ✅ | Prêt dès que auth stub ou A0.6 |
 | 7 | `A1.1-worker-entity-crud` | A.1 | L | A0.5 | |
 | 8 | `A1.2-worker-documents-upload` | A.1 | L | A1.1 | Chiffrement CMEK |
 | 9 | `A1.3-document-expiry-alerts` | A.1 | M | A1.2 | |
@@ -98,7 +99,7 @@
 
 | Sprint | Début planifié | Fin planifiée | Prompts totaux | Complétés | Statut |
 |--------|----------------|---------------|----------------|-----------|--------|
-| A.0 | S1 | S1 | 6 | 3 | 🟡 En cours (A0.4 + A0.6 bloqués externe) |
+| A.0 | S1 | S1 | 6 | 4 | 🟡 En pause (A0.4 + A0.6 bloqués externe) |
 | A.1 | S2 | S3 | 7 | 0 | 🔵 |
 | A.2 | S4 | S5 | 6 | 0 | 🔵 |
 | A.3 | S6 | S7 | 6 | 0 | 🔵 |
@@ -122,6 +123,9 @@ Décisions prises et non renégociables sans ADR. Mettre à jour au fil de l'eau
 | 2026-04-21 | Packages exportent `.ts` direct (pas de compile intermédiaire) | A0.1 SESSION-LOG | A0.1 |
 | 2026-04-21 | Pas de `composite: true` ni project refs à ce stade | A0.1 SESSION-LOG | A0.1 |
 | 2026-04-21 | `docs/`, `prompts/`, `skills/`, CLAUDE.md, README.md exclus de Prettier | `.prettierignore` | A0.1 |
+| 2026-04-21 | Augmentation Express via `namespace Express` globale pour `req.user` | `tenant.middleware.ts` | A0.5 |
+| 2026-04-21 | `pnpm.onlyBuiltDependencies` : esbuild, @prisma/client, @prisma/engines, prisma | `package.json` | A0.5 |
+| 2026-04-21 | 18 modèles Prisma + 13 enums, FK `onDelete: Restrict` pour données légales | `apps/api/prisma/schema.prisma` | A0.5 |
 
 ---
 
@@ -178,6 +182,9 @@ Décisions prises et non renégociables sans ADR. Mettre à jour au fil de l'eau
 | DETTE-007 | 2026-04-21 | A0.3 | Appliquer branch protection sur `main` via `gh api` (cf. `docs/github-branch-protection.md`) | H | immédiat — action humaine |
 | DETTE-008 | 2026-04-21 | A0.3 | Durcir `pnpm audit` en bloquant (retirer `\|\| true`) une fois Dependabot a nettoyé le backlog | L | A6.6 |
 | DETTE-009 | 2026-04-21 | A0.3 | Ajouter un job CI `build-api` quand l'app API aura un Dockerfile | M | A0.5 |
+| DETTE-010 | 2026-04-21 | A0.5 | Wrapper Prisma middleware qui injecte `where: { agencyId }` automatiquement (CLAUDE.md §3.5) | H | avant A1.1 |
+| DETTE-011 | 2026-04-21 | A0.5 | Tests d'intégration Prisma via Testcontainers Postgres pour isolation tenant réelle | H | avant A1.1 |
+| DETTE-012 | 2026-04-21 | A0.5 | Container `api` dans docker-compose pour tests E2E webhook → api → db | M | A3 |
 
 ---
 
