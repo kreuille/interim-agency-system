@@ -3,3 +3,5 @@ export * from './auth/role.js';
 export * from './workers/temp-worker.js';
 export * from './workers/errors.js';
 export * from './workers/ports/worker-repository.js';
+export * from './workers/documents/worker-document.js';
+export * from './workers/documents/ports/document-repository.js';
