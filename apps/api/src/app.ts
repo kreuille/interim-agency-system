@@ -8,10 +8,15 @@ import type {
 } from '@interim/application';
 import { createAuthMiddleware, type TokenVerifier } from './shared/middleware/auth.middleware.js';
 import { tenantMiddleware } from './shared/middleware/tenant.middleware.js';
+import {
+  createIdempotencyMiddleware,
+  type IdempotencyStore,
+} from './shared/middleware/idempotency.middleware.js';
 import { createWorkersRouter } from './infrastructure/http/controllers/workers.controller.js';
 
 export interface AppDeps {
   readonly tokenVerifier: TokenVerifier;
+  readonly idempotencyStore: IdempotencyStore;
   readonly workers: {
     readonly register: RegisterWorkerUseCase;
     readonly update: UpdateWorkerUseCase;
@@ -38,6 +43,9 @@ export function createApp(deps?: AppDeps): Express {
       void createAuthMiddleware(deps.tokenVerifier)(req, res, next);
     });
     app.use('/api/v1', tenantMiddleware);
+    app.use('/api/v1', (req, res, next) => {
+      void createIdempotencyMiddleware({ store: deps.idempotencyStore })(req, res, next);
+    });
     app.use('/api/v1/workers', createWorkersRouter(deps.workers));
   }
 

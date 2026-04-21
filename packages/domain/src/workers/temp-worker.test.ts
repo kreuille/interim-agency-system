@@ -75,4 +75,30 @@ describe('TempWorker', () => {
     const snap = worker.toSnapshot();
     expect(Object.isFrozen(snap)).toBe(true);
   });
+
+  it('changePhone to undefined removes the phone', () => {
+    const worker = buildWorker();
+    worker.changePhone(undefined, clock);
+    expect(worker.toSnapshot().phone).toBeUndefined();
+  });
+
+  it('changePhone to a new value updates it', () => {
+    const worker = buildWorker();
+    worker.changePhone(Phone.parse('+41790000002'), clock);
+    expect(worker.toSnapshot().phone?.toString()).toBe('+41790000002');
+  });
+
+  it('changeEmail to a new value updates it', () => {
+    const worker = buildWorker();
+    worker.changeEmail(Email.parse('new@example.ch'), clock);
+    expect(worker.toSnapshot().email?.toString()).toBe('new@example.ch');
+  });
+
+  it('rehydrate produces a valid worker instance', () => {
+    const source = buildWorker();
+    const snap = source.toSnapshot();
+    const copy = TempWorker.rehydrate({ ...snap });
+    expect(copy.id).toBe(source.id);
+    expect(copy.agencyId).toBe(source.agencyId);
+  });
 });

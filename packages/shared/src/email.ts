@@ -12,12 +12,7 @@ export class Email {
   }
 
   static isValid(input: string): boolean {
-    try {
-      Email.parse(input);
-      return true;
-    } catch {
-      return false;
-    }
+    return EMAIL_PATTERN.test(input.trim().toLowerCase());
   }
 
   toString(): string {

@@ -1,6 +1,6 @@
 # PROGRESS.md — État d'avancement du projet
 
-> **Dernière mise à jour** : 2026-04-21 22:30 — A1.1 worker entity CRUD complet. 101 tests verts.
+> **Dernière mise à jour** : 2026-04-21 22:45 — DETTE-010/017/018/019 fermées. 140 tests verts, coverage enforcement CI actif.
 > **Source de vérité** pour l'orchestrateur. **Ne jamais** le mettre à jour à la main sans avoir suivi le protocole `ORCHESTRATOR.md`.
 
 ---
@@ -13,7 +13,7 @@
 - **Prompts complétés** : 5 / 53
 - **Prompts détaillés prêts à exécuter** : 48 sprint + 5 OPS = **53/53** 🎉
 - **Blockers ouverts** : 2 (BLOCKER-001 sandbox MP, BLOCKER-002 autorisation LSE — externes, non-dev)
-- **Dette technique** : 19 tickets (voir §5)
+- **Dette technique** : 15 ouvertes / 4 fermées (DETTE-010, 017, 018, 019)
 - **Vélocité observée** : — (premier prompt tout juste fini)
 - **Skills disponibles** : 32 (voir `skills/README.md`)
 - **Documents de référence** : 10 (brief, spec, plan, archi, risques, rôles, registre nLPD, pr-template, ADR-0001, skills README)
@@ -130,6 +130,9 @@ Décisions prises et non renégociables sans ADR. Mettre à jour au fil de l'eau
 | 2026-04-21 | Auth Firebase Identity Platform multi-tenancy native | `docs/adr/0003-auth-choice.md` | Fondateur |
 | 2026-04-21 | RBAC 7 rôles × 12 actions typés ; MFA obligatoire pour `agency_admin` + `payroll_officer` | `packages/domain/src/auth/role.ts` | A0.6 |
 | 2026-04-21 | Repo **public** — GitHub Rulesets `main-protection` + secret scanning + Dependabot alerts activés | ruleset id 15364662 | Fondateur |
+| 2026-04-21 | Idempotency-Key inbound : UUID v4 + cache DB 24h, hash `sha256(method\|path\|body)` | `idempotency.middleware.ts` | DETTE-017 |
+| 2026-04-21 | Tenant-guard Prisma : defense-in-depth contre fuites cross-tenant via `$extends` | `tenant-guard.ts` | DETTE-019 |
+| 2026-04-21 | Coverage enforcement CI : seuils par workspace (domain 85%, shared 80%, app/api 70-80%) | `**/vitest.config.ts` + `.github/workflows/ci.yml` | DETTE-018 |
 
 ---
 
@@ -181,16 +184,16 @@ Décisions prises et non renégociables sans ADR. Mettre à jour au fil de l'eau
 | ~~DETTE-007~~ | 2026-04-21 | A0.3 | ~~Appliquer branch protection sur `main` via `gh api`~~ — **requalifiée DETTE-013** : feature payante sur repo privé | ~~H~~ | voir DETTE-013 |
 | DETTE-008 | 2026-04-21 | A0.3 | Durcir `pnpm audit` en bloquant (retirer `\|\| true`) une fois Dependabot a nettoyé le backlog | L | A6.6 |
 | DETTE-009 | 2026-04-21 | A0.3 | Ajouter un job CI `build-api` quand l'app API aura un Dockerfile | M | A0.5 |
-| DETTE-010 | 2026-04-21 | A0.5 | Wrapper Prisma middleware qui injecte `where: { agencyId }` automatiquement (CLAUDE.md §3.5) | H | avant A1.1 |
+| ~~DETTE-010~~ | 2026-04-21 | A0.5 | ~~Wrapper Prisma middleware qui injecte `where: { agencyId }`~~ — **fermée 2026-04-21** : remplacée par tenant-guard defense-in-depth (DETTE-019). L'injection automatique s'est avérée risquée (bypass involontaire) ; la garde de vérification est plus sûre | ~~H~~ | ✅ |
 | DETTE-011 | 2026-04-21 | A0.5 | Tests d'intégration Prisma via Testcontainers Postgres pour isolation tenant réelle | H | avant A1.1 |
 | DETTE-012 | 2026-04-21 | A0.5 | Container `api` dans docker-compose pour tests E2E webhook → api → db | M | A3 |
 | ~~DETTE-013~~ | 2026-04-21 | déblocage | ~~Branch protection/Rulesets GitHub~~ — **fermée 2026-04-21** : repo passé public, ruleset `main-protection` créé (id 15364662), secret scanning + push protection + Dependabot alerts activés | ~~H~~ | ✅ |
 | DETTE-014 | 2026-04-21 | déblocage | Créer projets Firebase `interim-agency-system` + `-staging` selon `docs/firebase-setup.md` | H | S1 |
 | DETTE-015 | 2026-04-21 | déblocage | Provisionner GCP `europe-west6` (Cloud SQL, Memorystore, Cloud Storage, Secret Manager, OIDC WIF) selon ADR-0002 | H | S2 |
 | DETTE-016 | 2026-04-21 | déblocage | Cloud Function `onCreate` qui pose les custom claims `agencyId` + `role` à l'inscription | M | A1.7 |
-| DETTE-017 | 2026-04-21 | A1.1 | `Idempotency-Key` cache inbound pour POST/PUT workers (retry-safety) | M | A2 |
-| DETTE-018 | 2026-04-21 | A1.1 | Mesurer la couverture CI (`vitest --coverage`) + enforcement seuils CLAUDE.md §2.3 | M | A1.2 |
-| DETTE-019 | 2026-04-21 | A1.1 | Prisma middleware tenant-injection (`where: { agencyId }` auto) — complète DETTE-010 | H | A1.4 |
+| ~~DETTE-017~~ | 2026-04-21 | A1.1 | ~~`Idempotency-Key` cache inbound pour POST/PUT workers~~ — **fermée 2026-04-21** : middleware + Prisma store + 7 tests + wired dans `/api/v1` | ~~M~~ | ✅ |
+| ~~DETTE-018~~ | 2026-04-21 | A1.1 | ~~Coverage CI enforcement~~ — **fermée 2026-04-21** : `@vitest/coverage-v8` + seuils par workspace + job CI `test-coverage` avec upload artifact HTML | ~~M~~ | ✅ |
+| ~~DETTE-019~~ | 2026-04-21 | A1.1 | ~~Prisma middleware tenant-injection~~ — **fermée 2026-04-21** : `installTenantGuard` via `$extends` + `assertTenantConsistent` fonction pure + 7 tests. Complète ~~DETTE-010~~ également | ~~H~~ | ✅ |
 
 ---
 

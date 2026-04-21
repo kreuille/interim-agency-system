@@ -20,12 +20,10 @@ export class Avs {
   }
 
   static isValid(input: string): boolean {
-    try {
-      Avs.parse(input);
-      return true;
-    } catch {
-      return false;
-    }
+    const trimmed = input.trim();
+    if (!AVS_FORMAT.test(trimmed)) return false;
+    const digits = trimmed.replace(/\./g, '');
+    return AVS_DIGITS_ONLY.test(digits) && isValidEan13Checksum(digits);
   }
 
   toString(): string {
