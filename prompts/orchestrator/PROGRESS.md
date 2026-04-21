@@ -26,7 +26,7 @@
 
 | Prompt | Sprint | Complété le | Branche / PR | Commit | Notes |
 |--------|--------|-------------|--------------|--------|-------|
-| `A0.1-init-monorepo` | A.0 | 2026-04-21 | `feat/A0.1-init-monorepo` | `8e3153d` | Monorepo pnpm + 4 packages + 4 apps + 15 tests verts (PR à ouvrir après création repo GitHub — DETTE-002) |
+| `A0.1-init-monorepo` | A.0 | 2026-04-21 | [`feat/A0.1-init-monorepo`](https://github.com/kreuille/interim-agency-system/pull/1) | `8e3153d` | Monorepo pnpm + 4 packages + 4 apps + 15 tests verts — PR #1 ouverte |
 
 ### 🟡 In progress
 
@@ -152,7 +152,7 @@ Décisions prises et non renégociables sans ADR. Mettre à jour au fil de l'eau
 | ID | Ouverte le | Prompt déclencheur | Description | Priorité | ETA |
 |----|-----------|-------------------|-------------|----------|-----|
 | DETTE-001 | 2026-04-21 | A0.1 | Réintroduire `composite: true` + project refs quand un vrai cas de build compilé apparaît (prod Docker image api) | M | A0.3 |
-| DETTE-002 | 2026-04-21 | A0.1 | Créer repo GitHub, pousser la branche et ouvrir la PR — action humaine | H | S1 |
+| ~~DETTE-002~~ | ~~2026-04-21~~ | ~~A0.1~~ | ~~Créer repo GitHub, pousser la branche et ouvrir la PR~~ — **fermée 2026-04-21, repo `kreuille/interim-agency-system` créé, PR #1 ouverte** | ~~H~~ | ✅ |
 | DETTE-003 | 2026-04-21 | A0.1 | Décider si on approuve les scripts postinstall esbuild via `pnpm approve-builds` dans CI | L | A0.3 |
 | DETTE-004 | 2026-04-21 | A0.1 | Renforcer le hook pré-commit avec `typecheck` incremental une fois composite en place | L | A0.3 |
 
