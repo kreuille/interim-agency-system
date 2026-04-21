@@ -5,6 +5,69 @@
 
 ---
 
+## Session 2026-04-21 21:20 — Déblocage BLOCKER-003, BLOCKER-004, DETTE-007
+
+- **Opérateur** : Claude Code (Opus 4.7) — déclencheur : user "blocker-003 on fait gcp / fait blocker-004 / fait dette-007"
+- **Sprint** : A.0 (clôture)
+- **Branche** : `chore/unblock-sprint-a0`
+- **Objectif** : acter le choix hosting GCP, scaffolder auth Firebase (A0.6 code-level), appliquer branch protection.
+
+### Déroulé
+
+1. **DETTE-007 (branch protection)** : essai `gh api PUT /repos/.../branches/main/protection` → **HTTP 403** ("Upgrade to GitHub Pro or make this repository public"). Essai Rulesets idem. → **Feature plan-payant sur repo privé** (~4 USD/mo GitHub Pro, ou passer le repo public). Documenté. DETTE-007 **requalifiée** en dette ouverte "plan GitHub à trancher" plutôt que résolue.
+2. **BLOCKER-003 (hosting)** : user choisit GCP → ADR-0002 rédigé, `europe-west6` (Zurich). Services : Cloud Run, Cloud SQL PostgreSQL, Memorystore Redis, Cloud Storage CMEK/KMS, Secret Manager, OIDC Workload Identity Federation. Checklist conformité nLPD (DPA Google Cloud Switzerland GmbH). Blocker fermé côté **décision** ; le provisioning effectif reste une action humaine (A0.4).
+3. **BLOCKER-004 (auth)** : ADR-0003 rédigé (Firebase Identity Platform, alignement GCP). Code A0.6 scaffolded :
+   - `packages/domain/src/auth/role.ts` : enum `Role` (7 rôles), matrice RBAC typée `Action`, helper `canAccess`, flag `requiresMfa` (admin + payroll_officer) + 7 tests.
+   - `apps/api/src/infrastructure/auth/firebase-admin.ts` : factory `getFirebaseApp()` / `getFirebaseAuth()` avec credential depuis JSON path (dev) ou ADC (GCP).
+   - `apps/api/src/infrastructure/auth/firebase-verifier.ts` : implémente `TokenVerifier` en vérifiant ID token Firebase et extrayant custom claims (`agencyId`, `role`, `mfa_verified`, `email_verified`).
+   - `apps/api/src/shared/middleware/auth.middleware.ts` : `createAuthMiddleware(verifier)` extrait Bearer, gate `emailVerified`, gate `requiresMfa(role) && !mfaVerified`, pose `req.user` pour le tenant middleware aval. 6 tests couvrant les 6 branches.
+   - `docs/firebase-setup.md` : procédure détaillée pour le fondateur (projets, tenants, providers, claims, service account, `.env`).
+4. Install `firebase-admin` 12.7.0 → quelques itérations lint (assertion inutile, require-await sur stubs, no-misused-promises). Factorisation du stubVerifier en fonction.
+5. Validation DoD : typecheck ✓ / lint ✓ / format:check ✓ / test **39/39** (vs 26 avant).
+
+### Livrables
+
+- `docs/adr/0002-hosting-choice.md`
+- `docs/adr/0003-auth-choice.md`
+- `docs/firebase-setup.md`
+- `packages/domain/src/auth/role.ts` + test (7 tests)
+- `apps/api/src/infrastructure/auth/firebase-admin.ts`
+- `apps/api/src/infrastructure/auth/firebase-verifier.ts`
+- `apps/api/src/shared/middleware/auth.middleware.ts` + test (6 tests)
+- `apps/api/package.json` (deps + `@interim/domain` en workspace)
+- `packages/domain/src/index.ts` export `auth/role`
+
+### Décisions
+
+1. **Hosting = GCP `europe-west6` Zurich** (ADR-0002). Choix stratégique : alignement Firebase + Cloud Run + multi-region CH, au prix d'un DPA avec hyperscaler US. Réversible si Cloud SQL PostgreSQL (pas Firestore/Spanner).
+2. **Auth = Firebase Identity Platform avec multi-tenancy native** (ADR-0003). Un `tenantId` Firebase = une agence ; custom claims portent `agencyId` + `role`.
+3. **RBAC codé typé côté `@interim/domain`** : 7 rôles × 12 actions matricés. Compile-error si quelqu'un référence un rôle/action inexistant. MFA-required flag par rôle.
+4. **`TokenVerifier` interface abstraite** : l'implémentation Firebase est dans `infrastructure/auth/firebase-verifier.ts`, le middleware dans `shared/middleware/` n'en dépend pas → facile à stubber en test, facile à remplacer par Supabase/Auth0 plus tard.
+5. **DETTE-007 NON résolue** : GitHub facture les branch protections et Rulesets sur repo privé. Trois options documentées (Pro payant, repo public, laisser ouvert). Choix du fondateur à venir.
+
+### Dettes ouvertes (nouvelles)
+
+- [ ] DETTE-013 : trancher GitHub Pro vs repo public vs rien (DETTE-007 réécrite).
+- [ ] DETTE-014 : créer les projets Firebase `interim-agency-system` + `-staging` selon `docs/firebase-setup.md` — action humaine fondateur.
+- [ ] DETTE-015 : provisionner GCP `europe-west6` (Cloud SQL, Memorystore, Cloud Storage, Secret Manager, OIDC WIF) selon ADR-0002 — action humaine fondateur (A0.4 complet).
+- [ ] DETTE-016 : Cloud Function `onCreate` qui pose les custom claims `agencyId` + `role` à l'inscription (A0.6 supplément côté Firebase).
+
+### Prochain prompt suggéré
+
+- `A1.1-worker-entity-crud` — A0.5 ✅, tenant middleware ✅, auth middleware ✅ (stub Firebase). Toutes les fondations sont posées pour A.1.
+- A0.4 effective (provisioning) attend action humaine (DETTE-015).
+- A0.6 effective (tenant Firebase créé) attend action humaine (DETTE-014).
+
+### Métriques
+
+- ADR nouveaux : 2 (0002 GCP, 0003 Firebase)
+- Docs nouveaux : 1 (`firebase-setup.md`)
+- Fichiers code : 5 (domain role + api firebase-admin + firebase-verifier + auth.middleware + export)
+- Tests nouveaux : 13 (7 role + 6 auth.middleware)
+- Total tests repo : **39** (vs 26 avant)
+
+---
+
 ## Session 2026-04-21 20:55 — Prompt A0.5 Prisma schema v0
 
 - **Opérateur** : Claude Code (Opus 4.7) — déclencheur : user (mode autonome)

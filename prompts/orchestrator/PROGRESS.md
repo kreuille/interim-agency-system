@@ -1,19 +1,19 @@
 # PROGRESS.md — État d'avancement du projet
 
-> **Dernière mise à jour** : 2026-04-21 21:00 — A0.5 complété, sprint A.0 stoppé sur blockers externes (A0.4, A0.6)
+> **Dernière mise à jour** : 2026-04-21 21:30 — ADR-0002 GCP + ADR-0003 Firebase + code auth. BLOCKER-003 et BLOCKER-004 levés côté décision/code. Provisioning effectif reste humain.
 > **Source de vérité** pour l'orchestrateur. **Ne jamais** le mettre à jour à la main sans avoir suivi le protocole `ORCHESTRATOR.md`.
 
 ---
 
 ## 0. Instantané
 
-- **Sprint courant** : A.0 (en pause — 4/6 prompts complétés, 2 bloqués externe)
-- **Phase** : en attente actions fondateur (BLOCKER-003 hosting, BLOCKER-004 auth Firebase, DETTE-007 branch protection)
-- **Prochain prompt** : `A0.6-auth-firebase-setup` dès que BLOCKER-004 levé, sinon `A1.1-worker-entity-crud` avec auth stub
-- **Prompts complétés** : 4 / 53 (48 sprint + 5 OPS transversal)
+- **Sprint courant** : A.0 (4/6 + scaffolding A0.6 sous session déblocage ; A0.4 = provisioning humain)
+- **Phase** : fondations prêtes, sprint A.1 débloqué (auth stubbable, tenant middleware, schema Prisma, CI verte, docker-compose)
+- **Prochain prompt** : `A1.1-worker-entity-crud`
+- **Prompts complétés** : 4 / 53
 - **Prompts détaillés prêts à exécuter** : 48 sprint + 5 OPS = **53/53** 🎉
-- **Blockers ouverts** : 4 (voir §4)
-- **Dette technique** : 12 tickets (voir §5)
+- **Blockers ouverts** : 2 (BLOCKER-001 sandbox MP, BLOCKER-002 autorisation LSE — externes, non-dev)
+- **Dette technique** : 16 tickets (voir §5)
 - **Vélocité observée** : — (premier prompt tout juste fini)
 - **Skills disponibles** : 32 (voir `skills/README.md`)
 - **Documents de référence** : 10 (brief, spec, plan, archi, risques, rôles, registre nLPD, pr-template, ADR-0001, skills README)
@@ -43,9 +43,9 @@
 
 | Ordre | Prompt | Sprint | Effort | BlockedBy | Notes |
 |-------|--------|--------|--------|-----------|-------|
-| 1 | `A0.4-hosting-ch-provisioning` | A.0 | L | BLOCKER-003 | 🚫 Bloqué — contrats Infomaniak/Exoscale + DPA |
-| 2 | `A0.6-auth-firebase-setup` | A.0 | M | BLOCKER-004 | 🚫 Bloqué — tenant Firebase à créer par le fondateur |
-| 3 | `A1.1-worker-entity-crud` | A.1 | L | A0.5 ✅ | Prêt dès que auth stub ou A0.6 |
+| 1 | `A1.1-worker-entity-crud` | A.1 | L | A0.5 ✅ | **Prêt à lancer** — auth middleware stubbable |
+| 2 | `A0.4-hosting-ch-provisioning` | A.0 | L | DETTE-015 | Action humaine fondateur (provisioning GCP selon ADR-0002) |
+| 3 | `A0.6-auth-firebase-setup` (côté tenant) | A.0 | S | DETTE-014 | Action humaine fondateur (création projets Firebase selon `docs/firebase-setup.md`) |
 | 7 | `A1.1-worker-entity-crud` | A.1 | L | A0.5 | |
 | 8 | `A1.2-worker-documents-upload` | A.1 | L | A1.1 | Chiffrement CMEK |
 | 9 | `A1.3-document-expiry-alerts` | A.1 | M | A1.2 | |
@@ -126,6 +126,9 @@ Décisions prises et non renégociables sans ADR. Mettre à jour au fil de l'eau
 | 2026-04-21 | Augmentation Express via `namespace Express` globale pour `req.user` | `tenant.middleware.ts` | A0.5 |
 | 2026-04-21 | `pnpm.onlyBuiltDependencies` : esbuild, @prisma/client, @prisma/engines, prisma | `package.json` | A0.5 |
 | 2026-04-21 | 18 modèles Prisma + 13 enums, FK `onDelete: Restrict` pour données légales | `apps/api/prisma/schema.prisma` | A0.5 |
+| 2026-04-21 | Hébergement GCP `europe-west6` (Zurich) — Cloud Run + Cloud SQL + CMEK | `docs/adr/0002-hosting-choice.md` | Fondateur |
+| 2026-04-21 | Auth Firebase Identity Platform multi-tenancy native | `docs/adr/0003-auth-choice.md` | Fondateur |
+| 2026-04-21 | RBAC 7 rôles × 12 actions typés ; MFA obligatoire pour `agency_admin` + `payroll_officer` | `packages/domain/src/auth/role.ts` | A0.6 |
 
 ---
 
@@ -140,23 +143,18 @@ Décisions prises et non renégociables sans ADR. Mettre à jour au fil de l'eau
 - **ETA** : S1
 - **Mitigation** : mock server OpenAPI local (`apps/mock-moveplanner`) si délai > 10 j
 
-### 🔴 BLOCKER-003 — Provisioning hébergement CH (Infomaniak/Exoscale) + DPA
+### ✅ BLOCKER-003 — Hosting **résolu côté décision** (GCP europe-west6)
 
-- **Ouvert le** : 2026-04-21 (identifié explicitement au sprint A.0)
-- **Bloque** : A0.4 (hosting), A6.5 (backup/restore DR)
-- **Action** : évaluer Infomaniak Public Cloud vs Exoscale, signer contrat + DPA, provisionner Postgres/Redis/Object Storage/DNS en zone CH, configurer OIDC pour GitHub Actions.
-- **Responsable** : fondateur
-- **ETA** : S2–S3
-- **Mitigation** : pendant le bloquage, la stack locale docker-compose (A0.2) suffit au dev ; CI tourne sur GH runners.
+- **Ouvert le** : 2026-04-21 — **Clos le** : 2026-04-21 (décision)
+- **Décision** : GCP `europe-west6` (Zurich). Voir `docs/adr/0002-hosting-choice.md`.
+- **Reste** : DETTE-015 — provisioning effectif (Cloud SQL + Memorystore + Cloud Storage + Secret Manager + OIDC WIF + DPA Google Cloud Switzerland GmbH). Action humaine, pas de blocker dev.
 
-### 🔴 BLOCKER-004 — Tenant Firebase (ou Supabase) + choix formel via ADR
+### ✅ BLOCKER-004 — Auth **résolu côté décision + code** (Firebase Identity Platform)
 
-- **Ouvert le** : 2026-04-21
-- **Bloque** : A0.6 (auth multi-tenant), A1.7 (admin UI auth), A2.4 (MP API client côté authz), A3.1 (webhooks HMAC)
-- **Action** : créer projet/tenant Firebase Identity Platform (ou Supabase) en région `europe-west6` (Zurich), activer MFA TOTP, générer service account JSON, rédiger ADR-0003 avec comparatif.
-- **Responsable** : fondateur + lead tech
-- **ETA** : S1
-- **Mitigation** : stub local d'auth middleware (tests unit uniquement) possible en attendant — mais le vrai wire doit attendre le tenant.
+- **Ouvert le** : 2026-04-21 — **Clos le** : 2026-04-21
+- **Décision** : Firebase Identity Platform, multi-tenancy native, un `tenantId` = une agence. Voir `docs/adr/0003-auth-choice.md`.
+- **Code posé** : RBAC typé (`@interim/domain/auth/role`), `TokenVerifier` abstrait + implémentation Firebase, `authMiddleware` avec gates email_verified + mfa_required, 13 tests verts.
+- **Reste** : DETTE-014 — créer les projets Firebase `interim-agency-system` + `-staging`, activer les providers, poser le service account JSON. Suivre `docs/firebase-setup.md`. Action humaine fondateur.
 
 ### 🔴 BLOCKER-002 — Autorisation cantonale LSE
 
@@ -179,12 +177,16 @@ Décisions prises et non renégociables sans ADR. Mettre à jour au fil de l'eau
 | DETTE-004 | 2026-04-21 | A0.1 | Renforcer le hook pré-commit avec `typecheck` incremental une fois composite en place | L | A0.3 |
 | DETTE-005 | 2026-04-21 | A0.2 | Ajouter container `api` dans docker-compose pour tester pipeline complet webhook mock → api | M | A0.3 |
 | DETTE-006 | 2026-04-21 | A0.2 | Compléter les endpoints du mock MovePlanner (couverture totale de docs/02) | L | A3 / A4 |
-| DETTE-007 | 2026-04-21 | A0.3 | Appliquer branch protection sur `main` via `gh api` (cf. `docs/github-branch-protection.md`) | H | immédiat — action humaine |
+| ~~DETTE-007~~ | 2026-04-21 | A0.3 | ~~Appliquer branch protection sur `main` via `gh api`~~ — **requalifiée DETTE-013** : feature payante sur repo privé | ~~H~~ | voir DETTE-013 |
 | DETTE-008 | 2026-04-21 | A0.3 | Durcir `pnpm audit` en bloquant (retirer `\|\| true`) une fois Dependabot a nettoyé le backlog | L | A6.6 |
 | DETTE-009 | 2026-04-21 | A0.3 | Ajouter un job CI `build-api` quand l'app API aura un Dockerfile | M | A0.5 |
 | DETTE-010 | 2026-04-21 | A0.5 | Wrapper Prisma middleware qui injecte `where: { agencyId }` automatiquement (CLAUDE.md §3.5) | H | avant A1.1 |
 | DETTE-011 | 2026-04-21 | A0.5 | Tests d'intégration Prisma via Testcontainers Postgres pour isolation tenant réelle | H | avant A1.1 |
 | DETTE-012 | 2026-04-21 | A0.5 | Container `api` dans docker-compose pour tests E2E webhook → api → db | M | A3 |
+| DETTE-013 | 2026-04-21 | déblocage | **Branch protection/Rulesets GitHub** — payants sur repo privé. Trancher GitHub Pro (~4 USD/mo), repo public, ou laisser ouvert. Remplace DETTE-007. | H | S1 |
+| DETTE-014 | 2026-04-21 | déblocage | Créer projets Firebase `interim-agency-system` + `-staging` selon `docs/firebase-setup.md` | H | S1 |
+| DETTE-015 | 2026-04-21 | déblocage | Provisionner GCP `europe-west6` (Cloud SQL, Memorystore, Cloud Storage, Secret Manager, OIDC WIF) selon ADR-0002 | H | S2 |
+| DETTE-016 | 2026-04-21 | déblocage | Cloud Function `onCreate` qui pose les custom claims `agencyId` + `role` à l'inscription | M | A1.7 |
 
 ---
 
