@@ -5,6 +5,63 @@
 
 ---
 
+## Session 2026-04-21 20:25 — Prompt A0.3 CI GitHub Actions
+
+- **Opérateur** : Claude Code (Opus 4.7) — déclencheur : user (mode autonome)
+- **Prompt** : `A0.3-ci-github-actions`
+- **Sprint** : A.0
+- **Branche** : `feat/A0.3-ci-github-actions`
+- **Dépendances** : A0.1 ✅, A0.2 ✅ (PR #2 mergée, stack compose disponible pour CI integration tests)
+- **Objectif** : workflows CI lint/typecheck/test + scan sécu + release tag, dependabot, CODEOWNERS, PR template GitHub.
+
+### Déroulé
+
+1. `.github/workflows/ci.yml` : 5 jobs parallélisés (lint+format, typecheck, test-unit, smoke-compose, audit). `smoke-compose` attend les healthchecks puis lance `scripts/smoke-test.sh`. `audit` non-bloquant (`|| true`) tant que Dependabot n'a pas purgé le fond.
+2. `.github/workflows/trivy.yml` : scan hebdo (lundi 05:00 UTC) — FS bloquant sur HIGH/CRITICAL, image mock-moveplanner informatif.
+3. `.github/workflows/release.yml` : trigger tag `v*.*.*`, build+push image mock vers `ghcr.io`, GitHub Release auto avec release notes générées.
+4. `.github/dependabot.yml` : npm hebdo (groupé : dev-tooling, typescript, test-tooling), github-actions hebdo, docker hebdo.
+5. `.github/CODEOWNERS` : @kreuille en global, zones conformité/MP/infra scopées.
+6. `.github/PULL_REQUEST_TEMPLATE.md` : copie strict de `docs/pr-template.md` (même contenu, GitHub exige qu'il soit dans `.github/` pour être auto-appliqué).
+7. `docs/github-branch-protection.md` : doc d'opération pour le fondateur — configuration requise sur `main` avec script `gh api` prêt à copier-coller.
+8. YAML parsés avec js-yaml (via require) — 4/4 valides.
+9. `pnpm format` (8 fichiers reformatés), `pnpm lint` vert, `pnpm format:check` vert.
+
+### Livrables
+
+- `.github/workflows/ci.yml` (5 jobs)
+- `.github/workflows/trivy.yml`
+- `.github/workflows/release.yml`
+- `.github/dependabot.yml`
+- `.github/CODEOWNERS`
+- `.github/PULL_REQUEST_TEMPLATE.md`
+- `docs/github-branch-protection.md`
+
+### Décisions
+
+1. **`audit` non-bloquant en CI pour commencer** — raison : à froid, pnpm audit remonte souvent des advisories transitives sans fix ; les traiter PR par PR via Dependabot plutôt que bloquer tout. Durcir plus tard (A0.6 ou A6.6 avant go-live).
+2. **Branch protection configurée en ops, pas versionnée** — raison : GitHub ne supporte pas de config declarative ; on documente dans `docs/github-branch-protection.md` avec script `gh api` reproductible. Alternative rejetée : settings-as-code via [github/safe-settings](https://github.com/github/safe-settings) — surdimensionné pour une seule org.
+3. **Trivy FS bloquant HIGH/CRITICAL, Trivy image non-bloquant** — raison : les vulns dans les images de base (node:20-alpine) évoluent vite et bloquer tout le run pour une CVE de libc mettrait la main à l'arrêt. On garde visibilité sans bloquer.
+4. **Pas de job E2E pour l'instant** — raison : aucune app web ne sert encore de feature testable. Arrive en A1.7 (admin UI) puis A3.6 (dashboard).
+
+### Dettes ouvertes (nouvelles)
+
+- [ ] DETTE-007 : appliquer la branch protection sur `main` via `gh api` (action humaine, cf. `docs/github-branch-protection.md`). Sans ça, les workflows CI ne sont pas un vrai gate.
+- [ ] DETTE-008 : durcir `pnpm audit` en bloquant (retirer `|| true`) une fois Dependabot a nettoyé le backlog initial.
+- [ ] DETTE-009 : ajouter un job `build-api` quand l'app API aura un Dockerfile (A0.4/A0.5).
+
+### Prochain prompt suggéré
+
+- `A0.5-prisma-schema-v0` — effort M, dépend d'A0.1 ✅. A0.4 (hosting CH) est **skip en autonome** : nécessite contrats externes (Infomaniak, DPA, DNS), voir BLOCKER-003 à ajouter. A0.6 (Firebase tenant) idem → BLOCKER-004.
+
+### Métriques
+
+- Fichiers créés : 7
+- Workflows : 3 (ci, trivy, release)
+- Jobs CI PR : 5
+- Durée estimée CI PR : ~4 min (install cache chaud + lint + typecheck + test parallélisés, smoke ~1 min)
+
+---
+
 ## Session 2026-04-21 20:00 — Prompt A0.2 docker-compose local
 
 - **Opérateur** : Claude Code (Opus 4.7) — déclencheur : user (mode autonome « continue »)

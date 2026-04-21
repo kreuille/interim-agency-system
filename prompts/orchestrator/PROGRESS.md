@@ -1,19 +1,19 @@
 # PROGRESS.md — État d'avancement du projet
 
-> **Dernière mise à jour** : 2026-04-21 20:20 — A0.2 complété, stack docker-compose locale verte
+> **Dernière mise à jour** : 2026-04-21 20:40 — A0.3 complété, CI GitHub Actions posée
 > **Source de vérité** pour l'orchestrateur. **Ne jamais** le mettre à jour à la main sans avoir suivi le protocole `ORCHESTRATOR.md`.
 
 ---
 
 ## 0. Instantané
 
-- **Sprint courant** : A.0 (en cours — 2/6 prompts complétés)
-- **Phase** : dev actif, stack locale opérationnelle
-- **Prochain prompt** : `A0.3-ci-github-actions`
-- **Prompts complétés** : 2 / 53 (48 sprint + 5 OPS transversal)
+- **Sprint courant** : A.0 (en cours — 3/6 prompts complétés)
+- **Phase** : dev actif, CI posée
+- **Prochain prompt** : `A0.5-prisma-schema-v0` (A0.4 et A0.6 différés → blockers externes)
+- **Prompts complétés** : 3 / 53 (48 sprint + 5 OPS transversal)
 - **Prompts détaillés prêts à exécuter** : 48 sprint + 5 OPS = **53/53** 🎉
-- **Blockers ouverts** : 2 (voir §4)
-- **Dette technique** : 4 tickets (voir §5)
+- **Blockers ouverts** : 4 (voir §4)
+- **Dette technique** : 9 tickets (voir §5)
 - **Vélocité observée** : — (premier prompt tout juste fini)
 - **Skills disponibles** : 32 (voir `skills/README.md`)
 - **Documents de référence** : 10 (brief, spec, plan, archi, risques, rôles, registre nLPD, pr-template, ADR-0001, skills README)
@@ -27,7 +27,8 @@
 | Prompt | Sprint | Complété le | Branche / PR | Commit | Notes |
 |--------|--------|-------------|--------------|--------|-------|
 | `A0.1-init-monorepo` | A.0 | 2026-04-21 | [PR #1](https://github.com/kreuille/interim-agency-system/pull/1) ✅ merged | `0b9cd1e` | Monorepo pnpm + 4 packages + 4 apps + 15 tests verts |
-| `A0.2-docker-compose-local` | A.0 | 2026-04-21 | `feat/A0.2-docker-compose-local` | (à pousser) | docker-compose + Makefile + mock MP + smoke test ; stack up en 13 s |
+| `A0.2-docker-compose-local` | A.0 | 2026-04-21 | [PR #2](https://github.com/kreuille/interim-agency-system/pull/2) ✅ merged | `3c36bd5` | docker-compose + Makefile + mock MP + smoke test ; stack up en 13 s |
+| `A0.3-ci-github-actions` | A.0 | 2026-04-21 | `feat/A0.3-ci-github-actions` | (à pousser) | 3 workflows (ci, trivy, release) + dependabot + CODEOWNERS + PR template |
 
 ### 🟡 In progress
 
@@ -41,10 +42,9 @@
 
 | Ordre | Prompt | Sprint | Effort | BlockedBy | Notes |
 |-------|--------|--------|--------|-----------|-------|
-| 1 | `A0.3-ci-github-actions` | A.0 | M | A0.1 ✅ | **Prêt à lancer** |
-| 3 | `A0.4-hosting-ch-provisioning` | A.0 | L | — | Parallèle A0.1 — nécessite commande Infomaniak/Exoscale |
-| 4 | `A0.5-prisma-schema-v0` | A.0 | M | A0.1 ✅ | Entités §4.1 brief |
-| 5 | `A0.6-auth-firebase-setup` | A.0 | M | A0.1 ✅ | MFA obligatoire |
+| 1 | `A0.5-prisma-schema-v0` | A.0 | M | A0.1 ✅ | **Prêt à lancer** — entités §4.1 brief |
+| 2 | `A0.4-hosting-ch-provisioning` | A.0 | L | BLOCKER-003 | 🚫 Bloqué — contrats Infomaniak/Exoscale + DPA |
+| 3 | `A0.6-auth-firebase-setup` | A.0 | M | A0.1 ✅ + BLOCKER-004 | 🚫 Bloqué — tenant Firebase à créer par le fondateur |
 | 7 | `A1.1-worker-entity-crud` | A.1 | L | A0.5 | |
 | 8 | `A1.2-worker-documents-upload` | A.1 | L | A1.1 | Chiffrement CMEK |
 | 9 | `A1.3-document-expiry-alerts` | A.1 | M | A1.2 | |
@@ -98,7 +98,7 @@
 
 | Sprint | Début planifié | Fin planifiée | Prompts totaux | Complétés | Statut |
 |--------|----------------|---------------|----------------|-----------|--------|
-| A.0 | S1 | S1 | 6 | 2 | 🟡 En cours |
+| A.0 | S1 | S1 | 6 | 3 | 🟡 En cours (A0.4 + A0.6 bloqués externe) |
 | A.1 | S2 | S3 | 7 | 0 | 🔵 |
 | A.2 | S4 | S5 | 6 | 0 | 🔵 |
 | A.3 | S6 | S7 | 6 | 0 | 🔵 |
@@ -136,6 +136,24 @@ Décisions prises et non renégociables sans ADR. Mettre à jour au fil de l'eau
 - **ETA** : S1
 - **Mitigation** : mock server OpenAPI local (`apps/mock-moveplanner`) si délai > 10 j
 
+### 🔴 BLOCKER-003 — Provisioning hébergement CH (Infomaniak/Exoscale) + DPA
+
+- **Ouvert le** : 2026-04-21 (identifié explicitement au sprint A.0)
+- **Bloque** : A0.4 (hosting), A6.5 (backup/restore DR)
+- **Action** : évaluer Infomaniak Public Cloud vs Exoscale, signer contrat + DPA, provisionner Postgres/Redis/Object Storage/DNS en zone CH, configurer OIDC pour GitHub Actions.
+- **Responsable** : fondateur
+- **ETA** : S2–S3
+- **Mitigation** : pendant le bloquage, la stack locale docker-compose (A0.2) suffit au dev ; CI tourne sur GH runners.
+
+### 🔴 BLOCKER-004 — Tenant Firebase (ou Supabase) + choix formel via ADR
+
+- **Ouvert le** : 2026-04-21
+- **Bloque** : A0.6 (auth multi-tenant), A1.7 (admin UI auth), A2.4 (MP API client côté authz), A3.1 (webhooks HMAC)
+- **Action** : créer projet/tenant Firebase Identity Platform (ou Supabase) en région `europe-west6` (Zurich), activer MFA TOTP, générer service account JSON, rédiger ADR-0003 avec comparatif.
+- **Responsable** : fondateur + lead tech
+- **ETA** : S1
+- **Mitigation** : stub local d'auth middleware (tests unit uniquement) possible en attendant — mais le vrai wire doit attendre le tenant.
+
 ### 🔴 BLOCKER-002 — Autorisation cantonale LSE
 
 - **Ouvert le** : 2026-04-21
@@ -157,6 +175,9 @@ Décisions prises et non renégociables sans ADR. Mettre à jour au fil de l'eau
 | DETTE-004 | 2026-04-21 | A0.1 | Renforcer le hook pré-commit avec `typecheck` incremental une fois composite en place | L | A0.3 |
 | DETTE-005 | 2026-04-21 | A0.2 | Ajouter container `api` dans docker-compose pour tester pipeline complet webhook mock → api | M | A0.3 |
 | DETTE-006 | 2026-04-21 | A0.2 | Compléter les endpoints du mock MovePlanner (couverture totale de docs/02) | L | A3 / A4 |
+| DETTE-007 | 2026-04-21 | A0.3 | Appliquer branch protection sur `main` via `gh api` (cf. `docs/github-branch-protection.md`) | H | immédiat — action humaine |
+| DETTE-008 | 2026-04-21 | A0.3 | Durcir `pnpm audit` en bloquant (retirer `\|\| true`) une fois Dependabot a nettoyé le backlog | L | A6.6 |
+| DETTE-009 | 2026-04-21 | A0.3 | Ajouter un job CI `build-api` quand l'app API aura un Dockerfile | M | A0.5 |
 
 ---
 

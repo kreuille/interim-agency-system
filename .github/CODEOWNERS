@@ -1,0 +1,24 @@
+# CODEOWNERS — définit les reviewers requis par zone du repo.
+# Voir docs/07-rôles.md pour le mapping nom ↔ rôle.
+# À compléter avec les handles GitHub réels des membres de l'équipe.
+
+# Défaut : fondateur + lead tech doivent reviewer tout ce qui ne matche pas une règle plus spécifique.
+*                                   @kreuille
+
+# Conformité — juriste/DPO obligatoire
+/docs/compliance/                   @kreuille
+/prompts/sprint-a5-payroll-invoicing/  @kreuille
+/prompts/sprint-a6-compliance-golive/  @kreuille
+
+# Intégration MovePlanner — toute modif du contrat d'interface nécessite vigilance cross-team
+/docs/02-partners-specification.md  @kreuille
+/apps/mock-moveplanner/             @kreuille
+
+# Infra / CI / sécu
+/.github/                           @kreuille
+/docker-compose.yml                 @kreuille
+/Makefile                           @kreuille
+
+# Règles d'ingénierie : toute modif passe par le lead tech
+/CLAUDE.md                          @kreuille
+/docs/adr/                          @kreuille
