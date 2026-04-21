@@ -9,6 +9,7 @@
     "dev": "tsx watch src/main.ts",
     "start": "node dist/main.js",
     "test": "vitest run",
+    "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
