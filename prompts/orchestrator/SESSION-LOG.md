@@ -5,6 +5,70 @@
 
 ---
 
+## Session 2026-04-21 20:00 — Prompt A0.2 docker-compose local
+
+- **Opérateur** : Claude Code (Opus 4.7) — déclencheur : user (mode autonome « continue »)
+- **Prompt** : `A0.2-docker-compose-local`
+- **Sprint** : A.0
+- **Branche** : `feat/A0.2-docker-compose-local`
+- **Skills** : `skills/dev/devops-swiss/SKILL.md`, `skills/dev/backend-node/SKILL.md`
+- **Dépendances** : A0.1 ✅ (PR #1 mergée)
+- **Objectif** : docker-compose (Postgres 16 + Redis 7 + MailHog + mock MP), Makefile, `.env.example`, smoke test.
+
+### Déroulé
+
+1. Branche `feat/A0.2-docker-compose-local` depuis `main` à jour.
+2. `docker-compose.yml` : Postgres 16 alpine, Redis 7 alpine, MailHog v1.0.1, mock-moveplanner (build local), tous avec healthchecks. Volumes nommés pour Postgres et Redis. Le mock expose `host.docker.internal:host-gateway` pour pouvoir pousser des webhooks vers l'API locale.
+3. `Makefile` : cibles `up`, `down`, `reset`, `restart`, `logs`, `ps`, `smoke`, `install`, `dev`, `typecheck`, `lint`, `test`, `format`.
+4. `.env.example` exhaustif (API, DB, Redis, SMTP MailHog, MovePlanner mock, Firebase placeholder, object storage placeholder). Aucune valeur sensible.
+5. `apps/mock-moveplanner/` nouveau workspace : Express 4, 6 endpoints stubbés (workers, availability, assignment response, timesheet sign, timesheet list, emit-webhook admin), signature HMAC-SHA256 sortante avec secret `dev-mock-secret`, 4 tests Vitest + Supertest.
+6. Dockerfile : première tentative avec `pnpm build` a échoué (tsconfig inclut les tests, tsc émettait des choses inattendues). Pivot sur runtime `tsx` direct (cohérent avec le pattern dev du repo, `pnpm dev` utilise tsx aussi). Build Docker passe en ~10 s.
+7. `scripts/smoke-test.sh` bash : Postgres `pg_isready`, Redis `ping`, MailHog UI 8025, mock MP `/health`.
+8. `docs/dev-setup.md` : guide complet (pré-requis, services, tableau des ports, troubleshooting, note Windows `choco install make`).
+9. README racine : lien vers `docs/dev-setup.md` et TL;DR.
+10. Fix lint itération 1 : `req.body` d'Express typé `any` → narrowing par `typeof === 'object' && 'slots' in body` ; handler `async` → Promise-returning handler remplacé par `.then/.catch` pour éviter `no-misused-promises`.
+11. Fix lint itération 2 : `any` résiduel sur le spread `echo: req.body` → intermédiaire `const echo: unknown = req.body`.
+12. `docker compose config --quiet` ✓, `docker compose build mock-moveplanner` ✓ (10 s), `docker compose up -d` ✓ (4 services), smoke test **4/4 verts** en ~13 s après démarrage.
+
+### Livrables
+
+- `docker-compose.yml`
+- `Makefile`
+- `.env.example`
+- `scripts/smoke-test.sh`
+- `apps/mock-moveplanner/{package.json, tsconfig.json, vitest.config.ts, Dockerfile, .dockerignore}`
+- `apps/mock-moveplanner/src/{main,app,hmac,app.test}.ts`
+- `docs/dev-setup.md`
+- `README.md` mis à jour (lien dev-setup + TL;DR)
+
+Tests nouveaux : 4 (mock MP). Total repo : **19 tests / 5 fichiers / 5 packages**.
+
+### Décisions
+
+1. **Runtime `tsx` dans le container mock plutôt que build `tsc` → `node`** — raison : le mock est un outil de dev, pas une image prod ; éviter un build step qui doublonne le flow `pnpm dev`. Cohérent avec `apps/api/package.json` qui utilise déjà tsx en dev.
+2. **Pas d'API container dans docker-compose pour l'instant** — raison : `pnpm dev` lance l'API en local avec hot reload, c'est plus confortable en dev. Le container API arrivera en A0.3 (build CI) et sera wired dans le compose en A0.4 (staging/prod).
+3. **`host.docker.internal:host-gateway` pour le mock → API locale** — raison : permet aux webhooks simulés de joindre l'API qui tourne sur l'hôte, compatible Docker Desktop et Linux (via `extra_hosts`).
+4. **Scripts smoke en bash, pas en TypeScript** — raison : un dev peut copier-coller le script sans dépendre du build TS. Cohérent avec les scripts d'ops habituels.
+
+### Dettes ouvertes (nouvelles)
+
+- [ ] DETTE-005 : ajouter un container `api` au docker-compose pour tester le pipeline complet webhook (mock → api). À faire en A0.3 quand l'image Docker de l'API existera.
+- [ ] DETTE-006 : le mock ne couvre pas *tous* les endpoints MovePlanner listés dans `docs/02-partners-specification.md`. Les compléter au fil des sprints (A3 pour webhooks entrants, A4 pour timesheets).
+
+### Prochain prompt suggéré
+
+- `A0.3-ci-github-actions` — effort M, dépend uniquement d'A0.1 ✅. Permet de sécuriser main avant qu'elle ne reçoive plus de commits.
+
+### Métriques
+
+- Fichiers créés/modifiés : 13
+- Durée build Docker image mock : ~10 s
+- Durée `docker compose up -d` → healthy : ~13 s (< 30 s DoD ✓)
+- Smoke test : 4/4 verts
+- Nouveaux tests : 4 (mock app)
+
+---
+
 ## Session 2026-04-21 19:30 — Prompt A0.1 init monorepo
 
 - **Opérateur** : Claude Code (Opus 4.7) — déclencheur : user

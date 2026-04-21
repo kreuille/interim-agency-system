@@ -1,0 +1,60 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: interim-postgres
+    ports:
+      - '5432:5432'
+    environment:
+      POSTGRES_USER: dev
+      POSTGRES_PASSWORD: dev
+      POSTGRES_DB: interim_dev
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U dev -d interim_dev']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: interim-redis
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    container_name: interim-mailhog
+    ports:
+      - '1025:1025'
+      - '8025:8025'
+
+  mock-moveplanner:
+    build:
+      context: ./apps/mock-moveplanner
+      dockerfile: Dockerfile
+    container_name: interim-mock-mp
+    ports:
+      - '3030:3030'
+    environment:
+      MOCK_HMAC_SECRET: dev-mock-secret
+      PORT: '3030'
+      API_WEBHOOK_URL: http://host.docker.internal:3000/webhooks/moveplanner
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:3030/health']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:
+  redis_data:
