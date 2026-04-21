@@ -1,16 +1,16 @@
 # PROGRESS.md — État d'avancement du projet
 
-> **Dernière mise à jour** : 2026-04-21 19:40 — A0.1 complété, monorepo pnpm fonctionnel
+> **Dernière mise à jour** : 2026-04-21 20:20 — A0.2 complété, stack docker-compose locale verte
 > **Source de vérité** pour l'orchestrateur. **Ne jamais** le mettre à jour à la main sans avoir suivi le protocole `ORCHESTRATOR.md`.
 
 ---
 
 ## 0. Instantané
 
-- **Sprint courant** : A.0 (en cours — 1/6 prompts complétés)
-- **Phase** : dev actif, monorepo posé
-- **Prochain prompt** : `A0.2-docker-compose-local`
-- **Prompts complétés** : 1 / 53 (48 sprint + 5 OPS transversal)
+- **Sprint courant** : A.0 (en cours — 2/6 prompts complétés)
+- **Phase** : dev actif, stack locale opérationnelle
+- **Prochain prompt** : `A0.3-ci-github-actions`
+- **Prompts complétés** : 2 / 53 (48 sprint + 5 OPS transversal)
 - **Prompts détaillés prêts à exécuter** : 48 sprint + 5 OPS = **53/53** 🎉
 - **Blockers ouverts** : 2 (voir §4)
 - **Dette technique** : 4 tickets (voir §5)
@@ -26,7 +26,8 @@
 
 | Prompt | Sprint | Complété le | Branche / PR | Commit | Notes |
 |--------|--------|-------------|--------------|--------|-------|
-| `A0.1-init-monorepo` | A.0 | 2026-04-21 | [`feat/A0.1-init-monorepo`](https://github.com/kreuille/interim-agency-system/pull/1) | `8e3153d` | Monorepo pnpm + 4 packages + 4 apps + 15 tests verts — PR #1 ouverte |
+| `A0.1-init-monorepo` | A.0 | 2026-04-21 | [PR #1](https://github.com/kreuille/interim-agency-system/pull/1) ✅ merged | `0b9cd1e` | Monorepo pnpm + 4 packages + 4 apps + 15 tests verts |
+| `A0.2-docker-compose-local` | A.0 | 2026-04-21 | `feat/A0.2-docker-compose-local` | (à pousser) | docker-compose + Makefile + mock MP + smoke test ; stack up en 13 s |
 
 ### 🟡 In progress
 
@@ -40,8 +41,7 @@
 
 | Ordre | Prompt | Sprint | Effort | BlockedBy | Notes |
 |-------|--------|--------|--------|-----------|-------|
-| 1 | `A0.2-docker-compose-local` | A.0 | S | A0.1 ✅ | **Prêt à lancer** |
-| 2 | `A0.3-ci-github-actions` | A.0 | M | A0.1 ✅ | |
+| 1 | `A0.3-ci-github-actions` | A.0 | M | A0.1 ✅ | **Prêt à lancer** |
 | 3 | `A0.4-hosting-ch-provisioning` | A.0 | L | — | Parallèle A0.1 — nécessite commande Infomaniak/Exoscale |
 | 4 | `A0.5-prisma-schema-v0` | A.0 | M | A0.1 ✅ | Entités §4.1 brief |
 | 5 | `A0.6-auth-firebase-setup` | A.0 | M | A0.1 ✅ | MFA obligatoire |
@@ -98,7 +98,7 @@
 
 | Sprint | Début planifié | Fin planifiée | Prompts totaux | Complétés | Statut |
 |--------|----------------|---------------|----------------|-----------|--------|
-| A.0 | S1 | S1 | 6 | 1 | 🟡 En cours |
+| A.0 | S1 | S1 | 6 | 2 | 🟡 En cours |
 | A.1 | S2 | S3 | 7 | 0 | 🔵 |
 | A.2 | S4 | S5 | 6 | 0 | 🔵 |
 | A.3 | S6 | S7 | 6 | 0 | 🔵 |
@@ -155,6 +155,8 @@ Décisions prises et non renégociables sans ADR. Mettre à jour au fil de l'eau
 | ~~DETTE-002~~ | ~~2026-04-21~~ | ~~A0.1~~ | ~~Créer repo GitHub, pousser la branche et ouvrir la PR~~ — **fermée 2026-04-21, repo `kreuille/interim-agency-system` créé, PR #1 ouverte** | ~~H~~ | ✅ |
 | DETTE-003 | 2026-04-21 | A0.1 | Décider si on approuve les scripts postinstall esbuild via `pnpm approve-builds` dans CI | L | A0.3 |
 | DETTE-004 | 2026-04-21 | A0.1 | Renforcer le hook pré-commit avec `typecheck` incremental une fois composite en place | L | A0.3 |
+| DETTE-005 | 2026-04-21 | A0.2 | Ajouter container `api` dans docker-compose pour tester pipeline complet webhook mock → api | M | A0.3 |
+| DETTE-006 | 2026-04-21 | A0.2 | Compléter les endpoints du mock MovePlanner (couverture totale de docs/02) | L | A3 / A4 |
 
 ---
 

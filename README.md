@@ -78,11 +78,23 @@ Le différenciateur concurrentiel : là où Pixid, Armado, PeoplePlanner sont pe
 1. Appliquez le protocole `prompts/orchestrator/ORCHESTRATOR.md` §3 à la lettre.
 2. Pas de raccourci. Pas de code avant la lecture. Pas de clôture sans mise à jour de `PROGRESS.md`.
 
-### Si vous voulez lancer le dev demain
+### Si vous voulez coder
 
-Lancez une session Claude Code dédiée avec comme premier prompt : **"Lis `CLAUDE.md`, `docs/03-plan-de-dev.md`, `prompts/orchestrator/ORCHESTRATOR.md`, `prompts/orchestrator/PROGRESS.md`, puis exécute `prompts/sprint-a0-setup/A0.1-init-monorepo.md`"**.
+Voir [`docs/dev-setup.md`](docs/dev-setup.md) pour le démarrage complet en < 2 min (clone → `make up` → `pnpm dev`).
 
-(Note : A0.1 sera rédigé en passe 2 de ce bootstrap — voir `prompts/orchestrator/SESSION-LOG.md` entrée du 2026-04-21 pour les dettes ouvertes.)
+TL;DR :
+
+```bash
+pnpm install
+cp .env.example .env
+make up       # Postgres + Redis + MailHog + mock MovePlanner
+make smoke    # smoke-test
+pnpm dev
+```
+
+### Si vous voulez lancer un nouveau prompt
+
+Lancez une session Claude Code avec comme premier prompt : **"Lis `CLAUDE.md`, `docs/03-plan-de-dev.md`, `prompts/orchestrator/ORCHESTRATOR.md`, `prompts/orchestrator/PROGRESS.md`, puis exécute le prompt désigné dans `PROGRESS.md §0 Prochain prompt`"**.
 
 ---
 
