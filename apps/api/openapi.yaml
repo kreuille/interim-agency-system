@@ -15,6 +15,7 @@ servers:
 tags:
   - name: Health
   - name: Workers
+  - name: Documents
 
 paths:
   /health:
@@ -128,6 +129,129 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /api/v1/workers/{id}/documents:
+    post:
+      tags: [Documents]
+      summary: Uploader un document (multipart, scanné antivirus)
+      description: >
+        Le serveur sniffe les magic bytes du fichier, rejette 400 si incohérent
+        avec le MIME déclaré. Le scan antivirus s'exécute après upload ; le
+        document est alors `PENDING_VALIDATION` (clean) ou `REJECTED` (infected).
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, type]
+              properties:
+                file: { type: string, format: binary }
+                type: { $ref: '#/components/schemas/DocumentType' }
+                issuedAt: { type: string, format: date-time }
+                expiresAt: { type: string, format: date-time }
+      responses:
+        '202':
+          description: Accepté, scan antivirus lancé
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [documentId, scanStatus]
+                properties:
+                  documentId: { type: string }
+                  scanStatus: { type: string, enum: [pending, clean, infected] }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '413':
+          description: Fichier trop grand (>10 Mo)
+        '415':
+          description: Type MIME non supporté (seuls pdf/jpeg/png/heic sont acceptés)
+    get:
+      tags: [Documents]
+      summary: Lister les documents d'un intérimaire
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Liste paginée
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/DocumentDetail' }
+                  nextCursor: { type: string, nullable: true }
+
+  /api/v1/workers/{id}/documents/{docId}/download:
+    get:
+      tags: [Documents]
+      summary: Obtenir une URL signée 15 min pour télécharger le document
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+        - { in: path, name: docId, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: URL signée
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [url, expiresInSeconds]
+                properties:
+                  url: { type: string, format: uri }
+                  expiresInSeconds: { type: integer, example: 900 }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/workers/{id}/documents/{docId}/validate:
+    patch:
+      tags: [Documents]
+      summary: Valider manuellement le document (rôle worker:write requis)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+        - { in: path, name: docId, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200':
+          description: Validé
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  documentId: { type: string }
+                  status: { type: string, enum: [VALID] }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Transition d'état invalide (déjà validé ou archivé)
+
+  /api/v1/workers/{id}/documents/{docId}:
+    delete:
+      tags: [Documents]
+      summary: Archiver (soft delete) un document — rôle worker:delete
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+        - { in: path, name: docId, required: true, schema: { type: string } }
+      responses:
+        '204': { description: Archivé + objet supprimé de l'Object Storage }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -163,6 +287,38 @@ components:
           oneOf:
             - { type: string }
             - { type: string, nullable: true }
+
+    DocumentType:
+      type: string
+      enum:
+        - permit_work
+        - permit_driving
+        - avs_card
+        - lamal_cert
+        - diploma
+        - suva_sst
+        - caces
+        - other
+
+    DocumentDetail:
+      type: object
+      required: [id, workerId, type, status, mimeType, sizeBytes, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        workerId: { type: string }
+        type: { $ref: '#/components/schemas/DocumentType' }
+        status:
+          type: string
+          enum: [PENDING_SCAN, PENDING_VALIDATION, VALID, EXPIRED, REJECTED, ARCHIVED]
+        mimeType: { type: string }
+        sizeBytes: { type: integer }
+        issuedAt: { type: string, format: date-time, nullable: true }
+        expiresAt: { type: string, format: date-time, nullable: true }
+        validatedBy: { type: string, nullable: true }
+        validatedAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        archivedAt: { type: string, format: date-time, nullable: true }
 
     WorkerDetail:
       type: object

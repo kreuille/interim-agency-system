@@ -8,3 +8,4 @@ export * from './canton.js';
 export * from './name.js';
 export * from './email.js';
 export * from './phone.js';
+export * from './magic-bytes.js';
