@@ -5,6 +5,44 @@
 
 ---
 
+## Session 2026-04-21 22:50 — Dettes 017/018/019/010 fermées
+
+- **Opérateur** : Claude Code (Opus 4.7) — déclencheur : user "résoud dette 17 à 19"
+- **Branche** : `chore/resolve-dette-017-018-019`
+
+### DETTE-017 — Idempotency-Key inbound (fermée)
+
+- Nouveau modèle Prisma `InboundIdempotencyKey` (migration `20260421194915_inbound_idempotency`), scoped `agencyId + idempotencyKey`, retention 24 h.
+- `createIdempotencyMiddleware({ store })` : extrait `Idempotency-Key`, valide UUID v4, hash SHA-256 de `method|path|body`, intercepte `res.json` pour cacher uniquement les 2xx.
+- 3 comportements : replay exact → réponse cachée, conflit (même key + body différent) → 422, miss (pas de key / GET) → passe-plat.
+- `PrismaIdempotencyStore` dans `infrastructure/persistence/prisma/`.
+- 7 tests avec store in-memory. Wired dans `app.ts` sur `/api/v1` derrière auth+tenant.
+
+### DETTE-019 (+ DETTE-010 remplacée) — Tenant-guard Prisma (fermée)
+
+- Extension Prisma `installTenantGuard(prisma)` via `$extends` : vérifie sur chaque opération tenant que `where.agencyId` / `data.agencyId` colle au `tryCurrentTenant().agencyId`.
+- Fonction pure `assertTenantConsistent({ model, operation, args, contextAgencyId })` testable sans DB.
+- `CrossTenantLeak` throw si mismatch. `TENANT_MODELS` (15) + `TENANT_GUARDED_ACTIONS` (14).
+- Factory `createGuardedPrismaClient()`.
+- 7 tests : match OK, mismatch where → throw, mismatch data create/upsert → throw, no-op Agency/idempotency, no-op hors contexte, no-op si agencyId absent.
+- **Décision** : garde défensive plutôt qu'injection auto. Injection auto rend les oublis silencieux (retourne tout) ; la garde remonte les écarts immédiatement. DETTE-010 (injection auto) requalifiée-remplacée par DETTE-019.
+
+### DETTE-018 — Coverage enforcement CI (fermée)
+
+- `@vitest/coverage-v8` en devDependencies root.
+- Chaque workspace testé a `test:coverage` + `coverage: { provider: 'v8', thresholds }` dans son `vitest.config.ts`.
+- Seuils : `packages/domain` 85% (CLAUDE.md §2.3), `packages/shared` 80%, `packages/application` 80%, `apps/api` 70%, `apps/mock-moveplanner` 70%/60%.
+- Nouveau job CI `test-coverage` : exécute `pnpm test:coverage` (échoue si seuils non-atteints) + upload HTML artifact.
+- Tests additionnels pour atteindre les seuils : Clock (3), Result (3), Money edge cases (4), Email isValid (1), Name/Phone equals (2), domain errors (4), TempWorker changePhone/Email/rehydrate (4).
+
+### Métriques
+
+- Tests : 101 → **140** (+39)
+- Coverage actuelle : domain 100% / shared 96.58% / app 84.14% / api 84.36% / mock 97.53%
+- Dettes fermées : 4 (DETTE-010, 017, 018, 019)
+
+---
+
 ## Session 2026-04-21 22:30 — Prompt A1.1 worker entity CRUD
 
 - **Opérateur** : Claude Code (Opus 4.7) — déclencheur : user "continue"

@@ -18,12 +18,8 @@ export class Iban {
   }
 
   static isValid(input: string): boolean {
-    try {
-      Iban.parse(input);
-      return true;
-    } catch {
-      return false;
-    }
+    const compact = input.replace(IBAN_STRIP, '').toUpperCase();
+    return CH_IBAN_PATTERN.test(compact) && mod97(compact);
   }
 
   toString(): string {

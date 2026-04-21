@@ -30,6 +30,38 @@ describe('mock-moveplanner', () => {
     expect(Array.isArray(body.data)).toBe(true);
     expect(body.data.length).toBeGreaterThan(0);
   });
+
+  it('POST /api/v1/partners/:id/workers returns accepted', async () => {
+    const response = await request(createMockApp(config))
+      .post('/api/v1/partners/mp-1/workers')
+      .send({ firstName: 'Jean' });
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ accepted: true });
+  });
+
+  it('POST /assignments/:id/response records response', async () => {
+    const response = await request(createMockApp(config))
+      .post('/api/v1/partners/mp-1/assignments/req-42/response')
+      .send({ accepted: true });
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ recorded: true });
+  });
+
+  it('POST /timesheets/:id/sign returns signed', async () => {
+    const response = await request(createMockApp(config))
+      .post('/api/v1/partners/mp-1/timesheets/ts-1/sign')
+      .send({});
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ signed: true });
+  });
+
+  it('POST /_mock/emit-webhook returns 502 when API is unreachable', async () => {
+    const response = await request(createMockApp(config))
+      .post('/_mock/emit-webhook')
+      .send({ event: 'worker.assignment.proposed', payload: { x: 1 } });
+    expect(response.status).toBe(502);
+    expect(response.body).toMatchObject({ dispatched: false });
+  });
 });
 
 describe('signWebhookPayload', () => {

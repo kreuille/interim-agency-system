@@ -54,6 +54,28 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
 
+  test-coverage:
+    name: Coverage (enforce thresholds)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: Run coverage with thresholds enforced
+        run: pnpm test:coverage
+      - name: Upload coverage HTML artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html
+          path: '**/coverage/**'
+          if-no-files-found: ignore
+          retention-days: 7
+
   smoke-compose:
     name: docker compose smoke
     runs-on: ubuntu-24.04

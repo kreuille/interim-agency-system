@@ -15,6 +15,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "test": "pnpm -r --if-present test",
+    "test:coverage": "pnpm -r --if-present test:coverage",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "husky || true"
@@ -22,6 +23,7 @@
   "devDependencies": {
     "@eslint/js": "^9.14.0",
     "@types/node": "^20.17.0",
+    "@vitest/coverage-v8": "^2.1.4",
     "eslint": "^9.14.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-import": "^2.31.0",

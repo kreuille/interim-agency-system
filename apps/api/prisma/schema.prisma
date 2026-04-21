@@ -590,6 +590,23 @@ model InboundWebhookEvent {
   @@map("inbound_webhook_events")
 }
 
+model InboundIdempotencyKey {
+  id             String   @id @default(uuid()) @db.Uuid
+  agencyId       String   @db.Uuid
+  idempotencyKey String
+  method         String
+  path           String
+  requestHash    String
+  responseStatus Int
+  responseBody   Json
+  createdAt      DateTime @default(now()) @db.Timestamptz(6)
+  expiresAt      DateTime @db.Timestamptz(6)
+
+  @@unique([agencyId, idempotencyKey])
+  @@index([agencyId, expiresAt])
+  @@map("inbound_idempotency_keys")
+}
+
 model OutboundIdempotencyKey {
   id              String                    @id @default(uuid()) @db.Uuid
   agencyId        String                    @db.Uuid

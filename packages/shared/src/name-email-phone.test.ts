@@ -29,6 +29,24 @@ describe('Email', () => {
   it('rejects no tld', () => {
     expect(() => Email.parse('a@b')).toThrow(InvalidEmail);
   });
+
+  it('isValid true/false without throwing', () => {
+    expect(Email.isValid('x@y.ch')).toBe(true);
+    expect(Email.isValid('bad')).toBe(false);
+  });
+});
+
+describe('Name', () => {
+  it('equals compares value strings', () => {
+    expect(Name.parse('Jean').equals(Name.parse('Jean'))).toBe(true);
+    expect(Name.parse('Jean').equals(Name.parse('Marc'))).toBe(false);
+  });
+});
+
+describe('Phone', () => {
+  it('equals compares E.164', () => {
+    expect(Phone.parse('+41780000001').equals(Phone.parse('0780000001'))).toBe(true);
+  });
 });
 
 describe('Phone', () => {
