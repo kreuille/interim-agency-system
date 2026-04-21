@@ -5,6 +5,59 @@
 
 ---
 
+## Session 2026-04-21 22:30 — Prompt A1.1 worker entity CRUD
+
+- **Opérateur** : Claude Code (Opus 4.7) — déclencheur : user "continue"
+- **Prompt** : `A1.1-worker-entity-crud`
+- **Sprint** : A.1
+- **Branche** : `feat/A1.1-worker-entity-crud`
+
+### Déroulé
+
+1. **VOs shared** : `Avs` (EAN-13), `Iban` (CH mod 97), `Canton` (26), `Name`, `Email`, `Phone` (E.164 + CH local auto). 28 nouveaux tests.
+2. **Domain `@interim/domain`** : entité `TempWorker` avec factories `create`/`rehydrate`, méthodes `rename`/`changeIban`/`changeResidenceCanton`/`changeEmail`/`changePhone`/`archive`, snapshot frozen. Port `WorkerRepository`. Errors typées (`DomainError`, `WorkerNotFound`, `DuplicateAvs`, `WorkerArchived`). 7 tests entité.
+3. **Application `@interim/application`** : 5 use cases + `AuditLogger` port + helpers `InMemory*` exportés. 14 tests.
+4. **Infrastructure (apps/api)** : `PrismaWorkerRepository`, `PrismaAuditLogger`, Zod DTOs, Express router `createWorkersRouter` avec RBAC check, wire dans `app.ts` + OpenAPI spec.
+5. **RBAC ajusté** : ajout `worker:delete` séparé de `worker:write`. Admin + HR = full, dispatcher = read+write (pas delete), viewer = read only.
+6. **Tests HTTP supertest** : 9 tests (401, 403 viewer, 201 dispatcher + audit, 409 duplicate, 400 invalid AVS, 404 unknown, roundtrip, PUT, DELETE admin, 403 dispatcher DELETE, cross-tenant 404).
+7. **ESLint** : rule `no-restricted-imports` rescopée à domain+application uniquement.
+
+### DoD
+
+- [x] Entité + VOs + use cases + repo Prisma + controllers REST + OpenAPI
+- [x] Multi-tenant isolation testée (agence A vs B → 404)
+- [x] Audit log écrit via port sur chaque mutation
+- [x] `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm test` verts
+- [ ] Idempotency-Key cache → DETTE-017
+- [ ] Tests intégration Testcontainers → DETTE-011 (existante)
+- [ ] Coverage measurement CI → DETTE-018
+
+### Décisions
+
+1. **`worker:write` / `worker:delete` actions distinctes** : dispatcher peut CRUD mais pas supprimer (conforme prompt A1.1).
+2. **Soft delete via `archivedAt` + GET 404 par défaut, `?includeArchived=true` pour reprendre**.
+3. **`AuditLogger` port applicatif** (pas appel direct Prisma depuis use case) — permet de swap l'impl pour Cloud Logging/Splunk plus tard.
+4. **Repository `upsert` générique** : entité porte son état, Prisma dispatch insert/update.
+5. **ESLint rule restreinte aux packages** domain/application : avant, ça bloquait le wire légitime `apps/api/src/app.ts → infrastructure/`.
+
+### Dettes ouvertes (nouvelles)
+
+- [ ] DETTE-017 : `Idempotency-Key` inbound cache pour POST/PUT (retry-safety).
+- [ ] DETTE-018 : measure coverage CI + enforce seuils CLAUDE.md §2.3.
+- [ ] DETTE-019 : Prisma middleware tenant-injection (complète DETTE-010).
+
+### Prochain prompt suggéré
+
+- `A1.2-worker-documents-upload` — bloqué par A1.1 ✅ ; logique codable localement, wire storage CMEK attend DETTE-015 (GCP provisioning).
+
+### Métriques
+
+- Fichiers : 25 nouveaux + modifs
+- Tests nouveaux : **62**
+- Total repo : **101 tests** (vs 39 après unblock)
+
+---
+
 ## Session 2026-04-21 21:50 — Repo public + branch protection appliquée
 
 - **Opérateur** : Claude Code (Opus 4.7) — déclencheur : user "1- passer public"
