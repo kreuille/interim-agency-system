@@ -26,7 +26,7 @@
 
 | Prompt | Sprint | Complété le | Branche / PR | Commit | Notes |
 |--------|--------|-------------|--------------|--------|-------|
-| `A0.1-init-monorepo` | A.0 | 2026-04-21 | `feat/A0.1-init-monorepo` | (à pousser) | Monorepo pnpm + 4 packages + 4 apps + 15 tests verts |
+| `A0.1-init-monorepo` | A.0 | 2026-04-21 | `feat/A0.1-init-monorepo` | `8e3153d` | Monorepo pnpm + 4 packages + 4 apps + 15 tests verts (PR à ouvrir après création repo GitHub — DETTE-002) |
 
 ### 🟡 In progress
 
