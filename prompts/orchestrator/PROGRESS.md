@@ -29,7 +29,7 @@
 | `A0.1-init-monorepo` | A.0 | 2026-04-21 | [PR #1](https://github.com/kreuille/interim-agency-system/pull/1) ✅ merged | `0b9cd1e` | Monorepo pnpm + 4 packages + 4 apps + 15 tests verts |
 | `A0.2-docker-compose-local` | A.0 | 2026-04-21 | [PR #2](https://github.com/kreuille/interim-agency-system/pull/2) ✅ merged | `3c36bd5` | docker-compose + Makefile + mock MP + smoke test ; stack up en 13 s |
 | `A0.3-ci-github-actions` | A.0 | 2026-04-21 | [PR #3](https://github.com/kreuille/interim-agency-system/pull/3) ✅ merged | `7e335e3` | 3 workflows (ci, trivy, release) + dependabot + CODEOWNERS + PR template ; CI verte sur PR #3 elle-même |
-| `A0.5-prisma-schema-v0` | A.0 | 2026-04-21 | `feat/A0.5-prisma-schema-v0` | (à pousser) | 18 modèles + 13 enums + migration initiale appliquée + seed idempotent + tenant middleware testé |
+| `A0.5-prisma-schema-v0` | A.0 | 2026-04-21 | [PR #17](https://github.com/kreuille/interim-agency-system/pull/17) ✅ merged | `7c0ac23` | 18 modèles + 13 enums + migration initiale appliquée + seed idempotent + tenant middleware testé |
 
 ### 🟡 In progress
 
