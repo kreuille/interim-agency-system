@@ -13,6 +13,9 @@ export default tseslint.config(
       '**/coverage/**',
       '**/.next/**',
       '**/*.tsbuildinfo',
+      // Service worker : globals navigateur spécifiques (self, caches, fetch),
+      // hors du scope TypeScript du projet.
+      '**/public/sw.js',
     ],
   },
   js.configs.recommended,

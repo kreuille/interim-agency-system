@@ -1,0 +1,177 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
+  color: #1a1a1a;
+  background: #f5f5f5;
+  line-height: 1.5;
+}
+
+main {
+  padding: 16px;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+a {
+  color: #0a4ea2;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.btn-primary {
+  background: #0a4ea2;
+  color: white;
+  border: none;
+  padding: 12px 16px;
+  border-radius: 6px;
+  font-weight: 500;
+  width: 100%;
+}
+
+.btn-primary:focus-visible {
+  outline: 3px solid #ffbf47;
+  outline-offset: 2px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+
+.field label {
+  font-weight: 500;
+}
+
+.field input {
+  padding: 12px;
+  border: 1px solid #999;
+  border-radius: 4px;
+  font-size: 1rem;
+}
+
+.field .error {
+  color: #c40000;
+}
+
+.banner {
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin: 12px 0;
+  font-size: 0.875rem;
+}
+
+.banner-warn {
+  background: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeeba;
+}
+
+.banner-info {
+  background: #e7f3fe;
+  color: #054a91;
+  border: 1px solid #b6dafd;
+}
+
+.week-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-bottom: 16px;
+}
+
+.day-cell {
+  background: white;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 12px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-height: 64px;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.day-cell.available {
+  background: #c8e6c9;
+  border-color: #1b5e20;
+}
+.day-cell.unavailable {
+  background: #ffcdd2;
+  border-color: #8b0000;
+}
+.day-cell.mixed {
+  background: #fff3cd;
+  border-color: #856404;
+}
+.day-cell.unknown {
+  background: white;
+}
+
+.day-cell strong {
+  font-size: 0.875rem;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  font-size: 0.875rem;
+}
+
+.toolbar .me {
+  color: #666;
+}
+
+.legend {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 0.75rem;
+  margin-top: 16px;
+  padding: 8px;
+  background: white;
+  border-radius: 6px;
+}
+
+.legend span {
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.legend span.available {
+  background: #c8e6c9;
+}
+.legend span.unavailable {
+  background: #ffcdd2;
+}
+.legend span.mixed {
+  background: #fff3cd;
+}
+.legend span.unknown {
+  background: #f0f0f0;
+}
