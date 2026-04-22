@@ -25,7 +25,8 @@ import type { WebhookSecretProvider } from './secret-rotation.service.js';
 export interface MoveplannerWebhookHandler {
   /**
    * Appelé seulement après vérification HMAC réussie. Reçoit le payload
-   * parsé + les headers MP utiles (eventId, timestamp, eventType).
+   * parsé + les headers MP utiles (eventId, timestamp, eventType,
+   * signature, secretVersion).
    * Doit être idempotent — l'idempotence par `eventId` est implémentée
    * en A3.2 (persistance inbound).
    */
@@ -33,6 +34,8 @@ export interface MoveplannerWebhookHandler {
     readonly eventId: string;
     readonly eventType: string;
     readonly timestamp: string;
+    readonly signature: string;
+    readonly secretVersion: 'current' | 'previous';
     readonly payload: unknown;
   }): Promise<void>;
 }
@@ -145,6 +148,7 @@ async function handle(
   const eventId = pickHeader(req, 'x-moveplanner-event-id') ?? '';
   const eventType = pickHeader(req, 'x-moveplanner-event-type') ?? 'unknown';
   const timestamp = pickHeader(req, 'x-moveplanner-timestamp') ?? '';
+  const signature = pickHeader(req, 'x-moveplanner-signature') ?? '';
 
   let payload: unknown;
   try {
@@ -161,7 +165,14 @@ async function handle(
   }
 
   try {
-    await deps.handler.handle({ eventId, eventType, timestamp, payload });
+    await deps.handler.handle({
+      eventId,
+      eventType,
+      timestamp,
+      signature,
+      secretVersion: result.secretVersion,
+      payload,
+    });
     res.status(200).json({ accepted: true });
   } catch (err) {
     log({
