@@ -22,3 +22,7 @@ export * from './contracts/contract-template.js';
 export * from './contracts/templates-fr.js';
 export * from './ged/legal-archive-entry.js';
 export * from './ged/legal-archive-repository.js';
+export * from './timesheets/anomaly.js';
+export * from './timesheets/anomaly-detector.js';
+export * from './timesheets/timesheet.js';
+export * from './timesheets/timesheet-repository.js';
