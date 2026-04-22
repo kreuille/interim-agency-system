@@ -76,6 +76,12 @@ export function createProposalsRouter(deps: ProposalsControllerDeps): Router {
   router.get('/', (req, res) => {
     void handleList(req, res, deps);
   });
+  router.get('/export.csv', (req, res) => {
+    void handleCsv(req, res, deps);
+  });
+  router.get('/stream', (req, res) => {
+    handleStream(req, res, deps);
+  });
   router.get('/:id', (req, res) => {
     void handleGet(req, res, deps);
   });
@@ -162,6 +168,112 @@ async function handleGet(
     return;
   }
   res.status(200).json(toDto(proposal));
+}
+
+async function handleCsv(
+  req: Request,
+  res: Response,
+  deps: ProposalsControllerDeps,
+): Promise<void> {
+  const ctx = requireRole(req, res, 'proposal:read');
+  if (!ctx) return;
+  const parsed = ListQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+    return;
+  }
+  const page = await deps.repo.list({
+    agencyId: ctx.agencyId as never,
+    ...(parsed.data.state !== undefined ? { state: parsed.data.state } : {}),
+    limit: parsed.data.limit ?? 1000,
+  });
+  const rows = page.items.map((p) => {
+    const dto = toDto(p);
+    return [
+      dto.id,
+      dto.externalRequestId,
+      dto.state,
+      dto.routingMode ?? '',
+      dto.proposedAt,
+      dto.responseDeadline ?? '',
+      dto.mission.clientName,
+      dto.mission.canton,
+      String(dto.mission.hourlyRateRappen),
+      dto.mission.startsAt,
+      dto.mission.endsAt,
+      dto.responseReason ?? '',
+    ];
+  });
+  const header = [
+    'id',
+    'externalRequestId',
+    'state',
+    'routingMode',
+    'proposedAt',
+    'responseDeadline',
+    'clientName',
+    'canton',
+    'hourlyRateRappen',
+    'startsAt',
+    'endsAt',
+    'responseReason',
+  ];
+  const csv = [header, ...rows].map((r) => r.map(escapeCsv).join(',')).join('\n');
+  res.set('content-type', 'text/csv; charset=utf-8');
+  res.set('content-disposition', 'attachment; filename="proposals.csv"');
+  res.status(200).send(csv);
+}
+
+function escapeCsv(value: string): string {
+  if (value.includes('"') || value.includes(',') || value.includes('\n')) {
+    return `"${value.replaceAll('"', '""')}"`;
+  }
+  return value;
+}
+
+/**
+ * Server-Sent Events (SSE) pour le dashboard temps quasi-réel.
+ *
+ * Implémentation MVP : poll repo toutes les 5s et émet l'état complet
+ * de la liste si changement détecté (hash naïf). Le client écoute
+ * simplement le canal `message`. Pour une vraie diff (delta events
+ * `proposal.state.changed`), il faudra brancher l'EventBus interne sur
+ * le SSE — DETTE-043 si on a besoin de < 1s de latence.
+ *
+ * Auth : header Authorization récupéré via `requireRole`. Pas de
+ * heartbeat explicite (les browsers reconnectent auto).
+ */
+function handleStream(req: Request, res: Response, deps: ProposalsControllerDeps): void {
+  const ctx = requireRole(req, res, 'proposal:read');
+  if (!ctx) return;
+  res.set('content-type', 'text/event-stream');
+  res.set('cache-control', 'no-cache, no-transform');
+  res.set('connection', 'keep-alive');
+  res.flushHeaders();
+
+  let lastSerialized = '';
+  const tick = async (): Promise<void> => {
+    try {
+      const page = await deps.repo.list({ agencyId: ctx.agencyId as never, limit: 200 });
+      const dto = page.items.map(toDto);
+      const serialized = JSON.stringify(dto);
+      if (serialized !== lastSerialized) {
+        lastSerialized = serialized;
+        res.write(`event: snapshot\ndata: ${serialized}\n\n`);
+      }
+    } catch {
+      // ignore tick error — la boucle continue
+    }
+  };
+  void tick();
+  const interval = setInterval(() => {
+    void tick();
+  }, 5000);
+
+  req.on('close', () => {
+    clearInterval(interval);
+    res.end();
+  });
 }
 
 async function handleRouting(

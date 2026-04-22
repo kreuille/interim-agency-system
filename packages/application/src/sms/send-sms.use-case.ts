@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { Phone } from '@interim/shared';
 import type { AgencyId } from '@interim/domain';
 import type { Clock, Result } from '@interim/shared';
-import { renderTemplate, type SmsTemplateRegistry } from './template-renderer.js';
+import { renderTemplate, type SmsLang, type SmsTemplateRegistry } from './template-renderer.js';
 import { maskPhone } from './phone-mask.js';
 import {
   SmsError,
@@ -17,6 +17,12 @@ export interface SendSmsInput {
   readonly to: string; // E.164 ou format CH local — normalisé via Phone
   readonly templateCode: string;
   readonly variables: Readonly<Record<string, unknown>>;
+  /**
+   * Langue du template à rendre. Si absente, fallback à `fr` (cf.
+   * `DEFAULT_SMS_LANG`). Choisi typiquement par le destinataire (canton
+   * de résidence ou préférence worker).
+   */
+  readonly lang?: SmsLang;
 }
 
 export interface SendSmsOutput {
@@ -82,7 +88,7 @@ export class SendSmsUseCase {
 
     let rendered;
     try {
-      rendered = renderTemplate(this.templates, input.templateCode, input.variables);
+      rendered = renderTemplate(this.templates, input.templateCode, input.variables, input.lang);
     } catch (err) {
       if (err instanceof SmsError) return { ok: false, error: err };
       throw err;
