@@ -5,6 +5,8 @@ import type {
   ArchiveDocumentUseCase,
   ArchiveWorkerUseCase,
   AssignRoutingModeUseCase,
+  DisputeTimesheetUseCase,
+  GetArchiveDownloadUrlUseCase,
   GetDownloadUrlUseCase,
   GetWeekAvailabilityUseCase,
   GetWorkerUseCase,
@@ -13,11 +15,16 @@ import type {
   RefuseOnBehalfUseCase,
   RegisterWorkerUseCase,
   RemoveSlotUseCase,
+  SignTimesheetUseCase,
   UpdateWorkerUseCase,
   UploadDocumentUseCase,
   ValidateDocumentUseCase,
 } from '@interim/application';
-import type { MissionProposalRepository } from '@interim/domain';
+import type {
+  LegalArchiveRepository,
+  MissionProposalRepository,
+  TimesheetRepository,
+} from '@interim/domain';
 import { createAuthMiddleware, type TokenVerifier } from './shared/middleware/auth.middleware.js';
 import { tenantMiddleware } from './shared/middleware/tenant.middleware.js';
 import {
@@ -28,6 +35,8 @@ import { createWorkersRouter } from './infrastructure/http/controllers/workers.c
 import { createWorkerDocumentsRouter } from './infrastructure/http/controllers/worker-documents.controller.js';
 import { createAvailabilityRouter } from './infrastructure/http/controllers/availability.controller.js';
 import { createProposalsRouter } from './infrastructure/http/controllers/proposals.controller.js';
+import { createTimesheetsRouter } from './infrastructure/http/controllers/timesheets.controller.js';
+import { createGedRouter } from './infrastructure/http/controllers/ged.controller.js';
 import { metricsRegistry } from './infrastructure/observability/metrics.js';
 import {
   createMoveplannerWebhookRouter,
@@ -62,6 +71,15 @@ export interface AppDeps {
     readonly assignRouting: AssignRoutingModeUseCase;
     readonly accept: AcceptOnBehalfUseCase;
     readonly refuse: RefuseOnBehalfUseCase;
+  };
+  readonly timesheets?: {
+    readonly repo: TimesheetRepository;
+    readonly sign: SignTimesheetUseCase;
+    readonly dispute: DisputeTimesheetUseCase;
+  };
+  readonly ged?: {
+    readonly repo: LegalArchiveRepository;
+    readonly getDownloadUrl: GetArchiveDownloadUrlUseCase;
   };
   readonly webhooks?: {
     readonly secrets: WebhookSecretProvider;
@@ -113,6 +131,25 @@ export function createApp(deps?: AppDeps): Express {
     app.use('/api/v1/workers/:id/availability', createAvailabilityRouter(deps.availability));
     if (deps.proposals) {
       app.use('/api/v1/proposals', createProposalsRouter(deps.proposals));
+    }
+    if (deps.timesheets) {
+      app.use(
+        '/api/v1/timesheets',
+        createTimesheetsRouter({
+          repo: deps.timesheets.repo,
+          signUseCase: deps.timesheets.sign,
+          disputeUseCase: deps.timesheets.dispute,
+        }),
+      );
+    }
+    if (deps.ged) {
+      app.use(
+        '/api/v1/ged',
+        createGedRouter({
+          repo: deps.ged.repo,
+          getDownloadUrl: deps.ged.getDownloadUrl,
+        }),
+      );
     }
   }
 

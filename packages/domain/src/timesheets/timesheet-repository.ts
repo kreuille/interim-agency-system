@@ -1,5 +1,5 @@
 import type { AgencyId, StaffId } from '../shared/ids.js';
-import type { Timesheet, TimesheetId } from './timesheet.js';
+import type { Timesheet, TimesheetId, TimesheetState } from './timesheet.js';
 
 /**
  * Port repository pour `Timesheet`. Multi-tenant strict (CLAUDE.md §3.5).
@@ -23,4 +23,22 @@ export interface TimesheetRepository {
     fromDate: Date,
     toDate: Date,
   ): Promise<readonly Timesheet[]>;
+
+  /**
+   * Liste paginée pour le dashboard dispatcher. Tri par `receivedAt` desc
+   * (plus récents en haut). Cursor opaque basé sur `receivedAt + id`.
+   */
+  list(input: ListTimesheetsInput): Promise<TimesheetPage>;
+}
+
+export interface ListTimesheetsInput {
+  readonly agencyId: AgencyId;
+  readonly state?: TimesheetState;
+  readonly limit?: number;
+  readonly cursor?: string;
+}
+
+export interface TimesheetPage {
+  readonly items: readonly Timesheet[];
+  readonly nextCursor: string | null;
 }
