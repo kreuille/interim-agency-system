@@ -1,12 +1,20 @@
 import type {
   AgencyId,
+  ListTimesheetsInput,
   StaffId,
   Timesheet,
   TimesheetId,
+  TimesheetPage,
   TimesheetRepository,
 } from '@interim/domain';
 import type { Result } from '@interim/shared';
 import { TimesheetMpError, type TimesheetMpPort } from './timesheet-mp-port.js';
+import type {
+  DashboardNotifier,
+  EmailNotifier,
+  TimesheetAnomalyNotification,
+} from './notifier-ports.js';
+import type { CctMinimumLookupInput, CctMinimumLookupPort } from './cct-minimum-lookup.port.js';
 
 /**
  * Repository in-memory pour Timesheet. Multi-tenant strict.
@@ -52,6 +60,36 @@ export class InMemoryTimesheetRepository implements TimesheetRepository {
       if (inRange) out.push(t);
     }
     return Promise.resolve(out);
+  }
+
+  list(input: ListTimesheetsInput): Promise<TimesheetPage> {
+    const all = [...this.byId.values()]
+      .filter((t) => {
+        const s = t.toSnapshot();
+        if (s.agencyId !== input.agencyId) return false;
+        if (input.state !== undefined && s.state !== input.state) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        const ra = a.toSnapshot().receivedAt.getTime();
+        const rb = b.toSnapshot().receivedAt.getTime();
+        if (ra !== rb) return rb - ra; // desc
+        return a.id.localeCompare(b.id);
+      });
+    const limit = input.limit ?? 50;
+    let start = 0;
+    if (input.cursor) {
+      const idx = all.findIndex((t) => this.cursorOf(t) === input.cursor);
+      start = idx >= 0 ? idx + 1 : 0;
+    }
+    const items = all.slice(start, start + limit);
+    const last = items.length > 0 ? items[items.length - 1] : undefined;
+    const nextCursor = start + limit < all.length && last ? this.cursorOf(last) : null;
+    return Promise.resolve({ items, nextCursor });
+  }
+
+  private cursorOf(t: Timesheet): string {
+    return `${t.toSnapshot().receivedAt.toISOString()}|${t.id}`;
   }
 
   size(): number {
@@ -122,5 +160,63 @@ export class StubTimesheetMpPort implements TimesheetMpPort {
     }
     this.disputeCalls.push({ ...input });
     return Promise.resolve({ ok: true, value: { disputed: true } });
+  }
+}
+
+/**
+ * `EmailNotifier` in-memory : enregistre les notifications + déduplique
+ * sur `(agencyId, timesheetId)` (idempotency contractuelle).
+ */
+export class InMemoryEmailNotifier implements EmailNotifier {
+  readonly notifications: TimesheetAnomalyNotification[] = [];
+  private readonly seen = new Set<string>();
+
+  notifyTimesheetAnomalies(input: TimesheetAnomalyNotification): Promise<void> {
+    const key = `${input.agencyId}:${input.timesheetId}`;
+    if (this.seen.has(key)) return Promise.resolve();
+    this.seen.add(key);
+    this.notifications.push(input);
+    return Promise.resolve();
+  }
+}
+
+/**
+ * `DashboardNotifier` in-memory : push toutes les alertes (pas de
+ * dedup côté push live, contrairement à l'email — c'est l'UI qui dédoublonne).
+ */
+export class InMemoryDashboardNotifier implements DashboardNotifier {
+  readonly alerts: TimesheetAnomalyNotification[] = [];
+
+  pushTimesheetAlert(input: TimesheetAnomalyNotification): Promise<void> {
+    this.alerts.push(input);
+    return Promise.resolve();
+  }
+}
+
+/**
+ * `CctMinimumLookupPort` in-memory : config par
+ * `(canton, branch?, periodFromIso)`. Renvoie le rate de la période
+ * applicable la plus récente <= atDate.
+ */
+export class InMemoryCctMinimumLookup implements CctMinimumLookupPort {
+  private readonly entries: {
+    canton: string;
+    branch?: string;
+    periodFrom: Date;
+    rateRappen: number;
+  }[] = [];
+
+  register(entry: { canton: string; branch?: string; periodFrom: Date; rateRappen: number }): this {
+    this.entries.push(entry);
+    return this;
+  }
+
+  resolve(input: CctMinimumLookupInput): Promise<number | undefined> {
+    const at = (input.atDate ?? new Date()).getTime();
+    const candidates = this.entries
+      .filter((e) => e.canton === input.canton && e.periodFrom.getTime() <= at)
+      .filter((e) => (input.branch ? e.branch === input.branch || !e.branch : true))
+      .sort((a, b) => b.periodFrom.getTime() - a.periodFrom.getTime());
+    return Promise.resolve(candidates[0]?.rateRappen);
   }
 }
