@@ -13,7 +13,7 @@
 - **Prompts complétés** : 5 / 53
 - **Prompts détaillés prêts à exécuter** : 48 sprint + 5 OPS = **53/53** 🎉
 - **Blockers ouverts** : 2 (BLOCKER-001 sandbox MP, BLOCKER-002 autorisation LSE — externes, non-dev)
-- **Dette technique** : 11 ouvertes / 8 fermées (DETTE-010/017/018/019/020/021/022/023)
+- **Dette technique** : 5 ouvertes / 14 fermées (003/004/005/009/010/011/012/017/018/019/020/021/022/023). DETTE-001 reportée A.6.
 - **Vélocité observée** : — (premier prompt tout juste fini)
 - **Skills disponibles** : 32 (voir `skills/README.md`)
 - **Documents de référence** : 10 (brief, spec, plan, archi, risques, rôles, registre nLPD, pr-template, ADR-0001, skills README)
@@ -175,18 +175,18 @@ Décisions prises et non renégociables sans ADR. Mettre à jour au fil de l'eau
 
 | ID | Ouverte le | Prompt déclencheur | Description | Priorité | ETA |
 |----|-----------|-------------------|-------------|----------|-----|
-| DETTE-001 | 2026-04-21 | A0.1 | Réintroduire `composite: true` + project refs quand un vrai cas de build compilé apparaît (prod Docker image api) | M | A0.3 |
+| DETTE-001 | 2026-04-21 | A0.1 | Composite TS + project refs (**reportée A.6 hardening** — runtime tsx du Dockerfile API, pas besoin d'un build TS intermédiaire à ce stade) | M | A6 |
 | ~~DETTE-002~~ | ~~2026-04-21~~ | ~~A0.1~~ | ~~Créer repo GitHub, pousser la branche et ouvrir la PR~~ — **fermée 2026-04-21, repo `kreuille/interim-agency-system` créé, PR #1 ouverte** | ~~H~~ | ✅ |
-| DETTE-003 | 2026-04-21 | A0.1 | Décider si on approuve les scripts postinstall esbuild via `pnpm approve-builds` dans CI | L | A0.3 |
-| DETTE-004 | 2026-04-21 | A0.1 | Renforcer le hook pré-commit avec `typecheck` incremental une fois composite en place | L | A0.3 |
-| DETTE-005 | 2026-04-21 | A0.2 | Ajouter container `api` dans docker-compose pour tester pipeline complet webhook mock → api | M | A0.3 |
+| ~~DETTE-003~~ | 2026-04-21 | A0.1 | ~~pnpm approve-builds~~ — **fermée 2026-04-22** : whitelist `pnpm.onlyBuiltDependencies` (esbuild + prisma + @prisma/client + @prisma/engines) en place depuis A0.5 | ~~L~~ | ✅ |
+| ~~DETTE-004~~ | 2026-04-21 | A0.1 | ~~Hook pré-commit typecheck~~ — **fermée 2026-04-22** : `.husky/pre-commit` exécute `pnpm typecheck` après lint-staged | ~~L~~ | ✅ |
+| ~~DETTE-005~~ | 2026-04-21 | A0.2 | ~~Container `api` dans docker-compose~~ — **fermée 2026-04-22** : `apps/api/Dockerfile` multi-stage + service `api` profil `e2e`. Smoke test `/health` OK | ~~M~~ | ✅ |
 | DETTE-006 | 2026-04-21 | A0.2 | Compléter les endpoints du mock MovePlanner (couverture totale de docs/02) | L | A3 / A4 |
 | ~~DETTE-007~~ | 2026-04-21 | A0.3 | ~~Appliquer branch protection sur `main` via `gh api`~~ — **requalifiée DETTE-013** : feature payante sur repo privé | ~~H~~ | voir DETTE-013 |
 | DETTE-008 | 2026-04-21 | A0.3 | Durcir `pnpm audit` en bloquant (retirer `\|\| true`) une fois Dependabot a nettoyé le backlog | L | A6.6 |
-| DETTE-009 | 2026-04-21 | A0.3 | Ajouter un job CI `build-api` quand l'app API aura un Dockerfile | M | A0.5 |
+| ~~DETTE-009~~ | 2026-04-21 | A0.3 | ~~Job CI `build-api`~~ — **fermée 2026-04-22** : workflow `build-api` ajouté à `ci.yml` (build + smoke run `curl /health`) | ~~M~~ | ✅ |
 | ~~DETTE-010~~ | 2026-04-21 | A0.5 | ~~Wrapper Prisma middleware qui injecte `where: { agencyId }`~~ — **fermée 2026-04-21** : remplacée par tenant-guard defense-in-depth (DETTE-019). L'injection automatique s'est avérée risquée (bypass involontaire) ; la garde de vérification est plus sûre | ~~H~~ | ✅ |
-| DETTE-011 | 2026-04-21 | A0.5 | Tests d'intégration Prisma via Testcontainers Postgres pour isolation tenant réelle | H | avant A1.1 |
-| DETTE-012 | 2026-04-21 | A0.5 | Container `api` dans docker-compose pour tests E2E webhook → api → db | M | A3 |
+| ~~DETTE-011~~ | 2026-04-21 | A0.5 | ~~Tests intégration Prisma Testcontainers~~ — **fermée 2026-04-22** : `worker.repository.integration.test.ts` (6 tests) + `vitest.integration.config.ts` + job CI `test-integration` | ~~H~~ | ✅ |
+| ~~DETTE-012~~ | 2026-04-21 | A0.5 | ~~Container `api` dans docker-compose pour E2E~~ — **fermée 2026-04-22** : couverte par DETTE-005 (service `api` profile `e2e`) | ~~M~~ | ✅ |
 | ~~DETTE-013~~ | 2026-04-21 | déblocage | ~~Branch protection/Rulesets GitHub~~ — **fermée 2026-04-21** : repo passé public, ruleset `main-protection` créé (id 15364662), secret scanning + push protection + Dependabot alerts activés | ~~H~~ | ✅ |
 | DETTE-014 | 2026-04-21 | déblocage | Créer projets Firebase `interim-agency-system` + `-staging` selon `docs/firebase-setup.md` | H | S1 |
 | DETTE-015 | 2026-04-21 | déblocage | Provisionner GCP `europe-west6` (Cloud SQL, Memorystore, Cloud Storage, Secret Manager, OIDC WIF) selon ADR-0002 | H | S2 |
