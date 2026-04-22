@@ -59,3 +59,7 @@ export * from './contracts/generate-mission-contract.use-case.js';
 export * from './contracts/contract-pdf-ports.js';
 export * from './contracts/render-mission-contract-pdf.use-case.js';
 export * from './contracts/test-helpers.js';
+export * from './signature/esignature-provider.js';
+export * from './signature/send-contract-for-signature.use-case.js';
+export * from './signature/handle-signature-callback.use-case.js';
+export * from './signature/test-helpers.js';
