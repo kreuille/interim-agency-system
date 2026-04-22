@@ -2,17 +2,22 @@
  * Sentry — capture des événements ouverture/fermeture de circuit breaker
  * et autres anomalies infra.
  *
- * **Stub MVP** : pas de SDK installé pour garder le bundle léger. Les
- * événements partent dans `console.warn` avec préfixe `[sentry]`. Quand
- * `SENTRY_DSN` est configuré (DETTE-032), remplacer le corps des fonctions
- * par `Sentry.captureMessage / Sentry.captureException` (`@sentry/node`).
+ * Deux implémentations :
+ *  - `ConsoleSentryReporter` : écrit dans `console.warn/error` avec le
+ *    préfixe `[sentry:level]`. Utilisé en dev et en test.
+ *  - `SdkSentryReporter` : wrap `@sentry/node`. Activé si `SENTRY_DSN`
+ *    est défini dans l'env.
  *
- * Wiring prévu dans `apps/api/src/main.ts` après bootstrap Express :
+ * Helper `createSentryReporter()` choisit automatiquement selon la
+ * présence de `SENTRY_DSN` et appelle `Sentry.init` au passage.
+ *
+ * À appeler tout en haut de `main.ts` :
  *   ```ts
- *   import * as Sentry from '@sentry/node';
- *   Sentry.init({ dsn: process.env.SENTRY_DSN, environment: 'prod' });
+ *   const sentry = createSentryReporter({ release: process.env.VERSION });
  *   ```
  */
+
+import * as Sentry from '@sentry/node';
 
 export interface SentryReporter {
   captureMessage(
@@ -38,6 +43,54 @@ export class ConsoleSentryReporter implements SentryReporter {
     const tagsStr = tags ? ` ${JSON.stringify(tags)}` : '';
     console.error(`[sentry:exception] ${message}${tagsStr}`);
   }
+}
+
+/**
+ * Wrap `@sentry/node`. À utiliser après `Sentry.init` (fait par
+ * `createSentryReporter`).
+ */
+export class SdkSentryReporter implements SentryReporter {
+  captureMessage(
+    message: string,
+    level: 'info' | 'warning' | 'error',
+    tags?: Record<string, string>,
+  ): void {
+    Sentry.withScope((scope) => {
+      if (tags) scope.setTags(tags);
+      scope.setLevel(level);
+      Sentry.captureMessage(message, level);
+    });
+  }
+
+  captureException(err: unknown, tags?: Record<string, string>): void {
+    Sentry.withScope((scope) => {
+      if (tags) scope.setTags(tags);
+      Sentry.captureException(err);
+    });
+  }
+}
+
+/**
+ * Initialise Sentry si `SENTRY_DSN` est défini et renvoie le bon
+ * reporter. À appeler une seule fois, tout en haut de `main.ts`.
+ */
+export function createSentryReporter(
+  opts: {
+    readonly dsn?: string | undefined;
+    readonly environment?: string | undefined;
+    readonly release?: string | undefined;
+    readonly tracesSampleRate?: number | undefined;
+  } = {},
+): SentryReporter {
+  const dsn = opts.dsn ?? process.env.SENTRY_DSN;
+  if (!dsn || dsn.length === 0) return new ConsoleSentryReporter();
+  Sentry.init({
+    dsn,
+    environment: opts.environment ?? process.env.NODE_ENV ?? 'dev',
+    ...(opts.release !== undefined ? { release: opts.release } : {}),
+    tracesSampleRate: opts.tracesSampleRate ?? 0.1,
+  });
+  return new SdkSentryReporter();
 }
 
 /**

@@ -28,6 +28,7 @@
     "@interim/domain": "workspace:*",
     "@interim/shared": "workspace:*",
     "@prisma/client": "^5.22.0",
+    "@sentry/node": "^8.41.0",
     "@google-cloud/storage": "^7.13.0",
     "bullmq": "^5.34.5",
     "clamscan": "^2.4.0",

@@ -138,6 +138,14 @@ enum OutboundIdempotencyStatus {
   FAILED
 }
 
+enum AvailabilityOutboxStatus {
+  PENDING
+  IN_PROGRESS
+  SUCCESS
+  FAILED
+  DEAD
+}
+
 // ============================================================================
 // Agency (tenant root)
 // ============================================================================
@@ -624,4 +632,45 @@ model OutboundIdempotencyKey {
   @@unique([idempotencyKey])
   @@index([agencyId, endpoint, status])
   @@map("outbound_idempotency_keys")
+}
+
+// Pattern outbox pour push des disponibilités vers MovePlanner.
+// Inséré dans la même transaction que la mutation `WorkerAvailability`,
+// drainé par le worker BullMQ `availability-sync`.
+model OutboxAvailabilityPush {
+  id             String                    @id @default(uuid()) @db.Uuid
+  agencyId       String                    @db.Uuid
+  workerId       String                    @db.Uuid
+  idempotencyKey String                    @unique
+  payload        Json
+  status         AvailabilityOutboxStatus  @default(PENDING)
+  attempts       Int                       @default(0)
+  nextAttemptAt  DateTime?                 @db.Timestamptz(6)
+  lastError      String?
+  createdAt      DateTime                  @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime                  @updatedAt @db.Timestamptz(6)
+
+  // Index principal du `claimDue` (FOR UPDATE SKIP LOCKED) :
+  // statut + nextAttemptAt pour récupérer rapidement les rows dues.
+  @@index([status, nextAttemptAt])
+  @@index([agencyId, workerId, status])
+  @@map("outbox_availability_push")
+}
+
+// Snapshot persistant de l'aggregate WorkerAvailability (1 par
+// agency × worker). Les slots sont stockés en JSONB pour rester
+// flexibles pendant l'évolution du modèle (RRULE, source, reason).
+model WorkerAvailabilitySnapshot {
+  id              String   @id @default(uuid()) @db.Uuid
+  agencyId        String   @db.Uuid
+  workerId        String   @db.Uuid
+  slots           Json
+  lastUpdatedAt   DateTime @db.Timestamptz(6)
+  ttlExpiresAt    DateTime @db.Timestamptz(6)
+  createdAt       DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(6)
+
+  @@unique([agencyId, workerId])
+  @@index([agencyId, ttlExpiresAt])
+  @@map("worker_availability_snapshots")
 }

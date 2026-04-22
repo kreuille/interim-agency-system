@@ -8,7 +8,8 @@
 
 Une de ces conditions est observée pendant **plus de 10 minutes** consécutives :
 
-- Métrique Prometheus `mp_cb_state{endpoint="..."} = "open"` (à wirer DETTE-026 ; en attendant, lire les logs `[sentry:error] Circuit breaker '...' opened`).
+- Alerte Sentry `Circuit breaker 'mp-availability-push' opened` (level=error, tag `circuit`). Le SDK `@sentry/node` est wiré via `createSentryReporter()` quand `SENTRY_DSN` est défini ; en dev le reporter écrit `[sentry:error] Circuit breaker '...' opened` dans les logs.
+- Métrique Prometheus `mp_cb_state{endpoint="..."} = "open"` (à wirer DETTE-026).
 - Taux d'erreurs > 50 % sur la fenêtre `mp_request_total`.
 - Outbox `availability_push` qui empile sans drainer (`status='pending'` croissant, voir requête au §4).
 
