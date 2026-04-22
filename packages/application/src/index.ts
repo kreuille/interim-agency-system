@@ -32,3 +32,8 @@ export * from './availability/availability-push-port.js';
 export * from './availability/enqueue-availability-push.use-case.js';
 export * from './availability/push-availability.use-case.js';
 export * from './availability/test-helpers.js';
+export * from './webhooks/inbound-webhook.js';
+export * from './webhooks/webhook-event-dispatcher.js';
+export * from './webhooks/record-inbound-webhook.use-case.js';
+export * from './webhooks/dispatch-inbound-webhook.use-case.js';
+export * from './webhooks/test-helpers.js';
