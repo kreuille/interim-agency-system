@@ -37,3 +37,5 @@ export * from './payroll/lpp-calc.js';
 export * from './payroll/is-brackets.js';
 export * from './payroll/payslip-engine.js';
 export * from './payroll/payslip-document.js';
+export * from './payments/pain001-types.js';
+export * from './payments/pain001-builder.js';
