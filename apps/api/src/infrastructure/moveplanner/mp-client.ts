@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { Result } from '@interim/shared';
+import { CircuitOpenError, type CircuitBreaker } from '../reliability/circuit-breaker.js';
 
 /**
  * Erreurs structurées renvoyées par le client MP.
@@ -63,6 +64,8 @@ export interface MpClientOptions {
   readonly fetchFn?: typeof fetch;
   /** Sleep override pour tests (default setTimeout). */
   readonly sleepFn?: (ms: number) => Promise<void>;
+  /** Optionnel : circuit breaker partagé pour tous les appels MP. */
+  readonly circuitBreaker?: CircuitBreaker;
 }
 
 export interface MpRequestOptions {
@@ -99,6 +102,7 @@ export class MpClient {
   private readonly retryBackoffMs: readonly number[];
   private readonly fetchFn: typeof fetch;
   private readonly sleepFn: (ms: number) => Promise<void>;
+  private readonly circuitBreaker?: CircuitBreaker;
 
   constructor(opts: MpClientOptions) {
     this.baseUrl = opts.baseUrl.replace(/\/$/, '');
@@ -108,6 +112,7 @@ export class MpClient {
     this.retryBackoffMs = opts.retryBackoffMs ?? DEFAULT_BACKOFF_MS;
     this.fetchFn = opts.fetchFn ?? fetch;
     this.sleepFn = opts.sleepFn ?? defaultSleep;
+    if (opts.circuitBreaker) this.circuitBreaker = opts.circuitBreaker;
   }
 
   async request<T>(opts: MpRequestOptions): Promise<Result<T, MpError>> {
@@ -134,7 +139,7 @@ export class MpClient {
     let attempt = 0;
     let lastError: MpError | undefined;
     while (attempt <= this.retryBackoffMs.length) {
-      const result = await this.doFetch(opts, idempotencyKey);
+      const result = await this.executeViaBreaker(opts, idempotencyKey);
       if (result.ok) {
         if (idempotencyKey) {
           await this.idempotencyStore.set(idempotencyKey, {
@@ -174,6 +179,44 @@ export class MpClient {
       ok: false,
       error: lastError ?? new MpError('network', undefined, 'unknown failure'),
     };
+  }
+
+  private async executeViaBreaker<T>(
+    opts: MpRequestOptions,
+    idempotencyKey: string | undefined,
+  ): Promise<Result<T, MpError>> {
+    if (!this.circuitBreaker) {
+      return this.doFetch<T>(opts, idempotencyKey);
+    }
+    try {
+      // Le breaker doit "voir" les échecs transients comme des throws
+      // pour qu'ils alimentent son err%. On re-throw les `MpError`
+      // server_error/network/rate_limited ; les client_error sont
+      // renvoyés sans déclencher le breaker (4xx ≠ panne du fournisseur).
+      return await this.circuitBreaker.execute(async () => {
+        const result = await this.doFetch<T>(opts, idempotencyKey);
+        if (
+          !result.ok &&
+          (result.error.kind === 'server_error' ||
+            result.error.kind === 'network' ||
+            result.error.kind === 'rate_limited')
+        ) {
+          throw result.error;
+        }
+        return result;
+      });
+    } catch (err) {
+      if (err instanceof CircuitOpenError) {
+        return {
+          ok: false,
+          error: new MpError('circuit_open', undefined, err.message),
+        };
+      }
+      if (err instanceof MpError) {
+        return { ok: false, error: err };
+      }
+      throw err;
+    }
   }
 
   private async doFetch<T>(
