@@ -11,3 +11,6 @@ export * from './clients/client-repository.js';
 export * from './clients/client-contract.js';
 export * from './clients/rate-card.js';
 export * from './compliance/cct-minimum-rate.js';
+export * from './availability/availability-slot.js';
+export * from './availability/worker-availability.js';
+export * from './availability/availability-events.js';
