@@ -5,6 +5,8 @@ import type {
   TimesheetId,
   TimesheetRepository,
 } from '@interim/domain';
+import type { Result } from '@interim/shared';
+import { TimesheetMpError, type TimesheetMpPort } from './timesheet-mp-port.js';
 
 /**
  * Repository in-memory pour Timesheet. Multi-tenant strict.
@@ -54,5 +56,71 @@ export class InMemoryTimesheetRepository implements TimesheetRepository {
 
   size(): number {
     return this.byId.size;
+  }
+}
+
+/**
+ * Stub `TimesheetMpPort` pour tests : enregistre les calls et permet
+ * d'orchestrer succès/erreur via `failNextSign` / `failNextDispute`.
+ * Idempotent côté stub : 2e call avec même idempotencyKey renvoie le
+ * même résultat sans incrémenter le compteur.
+ */
+export class StubTimesheetMpPort implements TimesheetMpPort {
+  readonly signCalls: {
+    readonly externalTimesheetId: string;
+    readonly idempotencyKey: string;
+    readonly approvedBy: string;
+    readonly approvedAt: Date;
+    readonly notes?: string;
+  }[] = [];
+  readonly disputeCalls: {
+    readonly externalTimesheetId: string;
+    readonly idempotencyKey: string;
+    readonly disputedBy: string;
+    readonly disputedAt: Date;
+    readonly reason: string;
+  }[] = [];
+  failNextSign?: 'transient' | 'permanent' | undefined;
+  failNextDispute?: 'transient' | 'permanent' | undefined;
+
+  notifySigned(input: {
+    externalTimesheetId: string;
+    idempotencyKey: string;
+    approvedBy: string;
+    approvedAt: Date;
+    notes?: string;
+  }): Promise<Result<{ signed: true; signedAt: Date }, TimesheetMpError>> {
+    if (this.failNextSign) {
+      const kind = this.failNextSign;
+      this.failNextSign = undefined;
+      return Promise.resolve({
+        ok: false,
+        error: new TimesheetMpError(kind, `simulated ${kind} on sign`),
+      });
+    }
+    this.signCalls.push({ ...input });
+    return Promise.resolve({
+      ok: true,
+      value: { signed: true, signedAt: input.approvedAt },
+    });
+  }
+
+  notifyDisputed(input: {
+    externalTimesheetId: string;
+    idempotencyKey: string;
+    disputedBy: string;
+    disputedAt: Date;
+    reason: string;
+  }): Promise<Result<{ disputed: true }, TimesheetMpError>> {
+    if (this.failNextDispute) {
+      const kind = this.failNextDispute;
+      this.failNextDispute = undefined;
+      return Promise.resolve({
+        ok: false,
+        error: new TimesheetMpError(kind, `simulated ${kind} on dispute`),
+      });
+    }
+    this.disputeCalls.push({ ...input });
+    return Promise.resolve({ ok: true, value: { disputed: true } });
   }
 }
