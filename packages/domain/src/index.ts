@@ -14,3 +14,5 @@ export * from './compliance/cct-minimum-rate.js';
 export * from './availability/availability-slot.js';
 export * from './availability/worker-availability.js';
 export * from './availability/availability-events.js';
+export * from './missions/mission-proposal.js';
+export * from './missions/mission-proposal-repository.js';
