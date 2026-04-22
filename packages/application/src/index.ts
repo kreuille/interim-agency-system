@@ -27,4 +27,8 @@ export * from './availability/availability-ports.js';
 export * from './availability/add-slot.use-case.js';
 export * from './availability/remove-slot.use-case.js';
 export * from './availability/get-week.use-case.js';
+export * from './availability/availability-outbox.js';
+export * from './availability/availability-push-port.js';
+export * from './availability/enqueue-availability-push.use-case.js';
+export * from './availability/push-availability.use-case.js';
 export * from './availability/test-helpers.js';
