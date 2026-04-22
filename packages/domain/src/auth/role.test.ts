@@ -46,4 +46,14 @@ describe('Role RBAC', () => {
     expect(requiresMfa('dispatcher')).toBe(false);
     expect(requiresMfa('viewer')).toBe(false);
   });
+
+  it('timesheet:read/write respect roles (dispatcher write, payroll_officer read-only)', () => {
+    expect(canAccess('dispatcher', 'timesheet:read')).toBe(true);
+    expect(canAccess('dispatcher', 'timesheet:write')).toBe(true);
+    expect(canAccess('payroll_officer', 'timesheet:read')).toBe(true);
+    expect(canAccess('payroll_officer', 'timesheet:write')).toBe(false);
+    expect(canAccess('sales', 'timesheet:read')).toBe(false);
+    expect(canAccess('viewer', 'timesheet:read')).toBe(true);
+    expect(canAccess('viewer', 'timesheet:write')).toBe(false);
+  });
 });

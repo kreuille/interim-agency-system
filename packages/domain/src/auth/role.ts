@@ -24,6 +24,8 @@ export type Action =
   | 'invoice:write'
   | 'proposal:read'
   | 'proposal:write'
+  | 'timesheet:read'
+  | 'timesheet:write'
   | 'audit:read'
   | 'compliance:export';
 
@@ -40,6 +42,8 @@ const RBAC_MATRIX: Readonly<Record<Role, ReadonlySet<Action>>> = {
     'invoice:write',
     'proposal:read',
     'proposal:write',
+    'timesheet:read',
+    'timesheet:write',
     'audit:read',
     'compliance:export',
   ]),
@@ -50,6 +54,7 @@ const RBAC_MATRIX: Readonly<Record<Role, ReadonlySet<Action>>> = {
     'payroll:write',
     'invoice:read',
     'invoice:write',
+    'timesheet:read',
     'audit:read',
   ]),
   dispatcher: new Set<Action>([
@@ -58,6 +63,8 @@ const RBAC_MATRIX: Readonly<Record<Role, ReadonlySet<Action>>> = {
     'client:read',
     'proposal:read',
     'proposal:write',
+    'timesheet:read',
+    'timesheet:write',
   ]),
   hr: new Set<Action>([
     'worker:read',
@@ -73,6 +80,7 @@ const RBAC_MATRIX: Readonly<Record<Role, ReadonlySet<Action>>> = {
     'payroll:read',
     'invoice:read',
     'proposal:read',
+    'timesheet:read',
   ]),
   auditor: new Set<Action>([
     'worker:read',
@@ -80,6 +88,7 @@ const RBAC_MATRIX: Readonly<Record<Role, ReadonlySet<Action>>> = {
     'payroll:read',
     'invoice:read',
     'proposal:read',
+    'timesheet:read',
     'audit:read',
     'compliance:export',
   ]),

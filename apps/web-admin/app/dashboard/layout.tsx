@@ -10,6 +10,7 @@ const NAV = [
   { label: 'Intérimaires', href: '/dashboard/workers', requires: 'worker:read' as const },
   { label: 'Clients', href: '/dashboard/clients', requires: 'client:read' as const },
   { label: 'Propositions', href: '/dashboard/proposals', requires: 'proposal:read' as const },
+  { label: 'Timesheets', href: '/dashboard/timesheets', requires: 'timesheet:read' as const },
   { label: 'Documents', href: '/dashboard/documents', requires: 'worker:read' as const },
   { label: 'Audit', href: '/dashboard/audit', requires: 'audit:read' as const },
 ];
