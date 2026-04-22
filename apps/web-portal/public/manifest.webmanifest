@@ -1,0 +1,22 @@
+{
+  "name": "Agence Intérim — Portail intérimaire",
+  "short_name": "Intérim",
+  "description": "Déclarez vos disponibilités et consultez vos missions.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f5f5",
+  "theme_color": "#0a4ea2",
+  "lang": "fr-CH",
+  "icons": [
+    {
+      "src": "/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}
