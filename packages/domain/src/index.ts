@@ -13,6 +13,7 @@ export * from './clients/rate-card.js';
 export * from './compliance/cct-minimum-rate.js';
 export * from './compliance/compliance-indicator.js';
 export * from './compliance/indicator-builders.js';
+export * from './compliance/seco-export.js';
 export * from './availability/availability-slot.js';
 export * from './availability/worker-availability.js';
 export * from './availability/availability-events.js';

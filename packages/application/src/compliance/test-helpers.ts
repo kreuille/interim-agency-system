@@ -161,3 +161,82 @@ export class FailingLseStatusPort implements LseStatusPort {
     return Promise.reject(new Error(this.reason));
   }
 }
+
+// =============================================================================
+// A6.2 SECO export — stubs ports
+// =============================================================================
+
+import type {
+  SecoContractRow,
+  SecoExportRange,
+  SecoLseInfo,
+  SecoMissionRow,
+  SecoTimesheetRow,
+  SecoWorkerRow,
+} from '@interim/domain';
+import type {
+  SecoContractsDataPort,
+  SecoExportAuditLogger,
+  SecoLseInfoPort,
+  SecoMissionsDataPort,
+  SecoTimesheetsDataPort,
+  SecoWorkersDataPort,
+} from './seco-export-ports.js';
+
+export class StubSecoWorkersDataPort implements SecoWorkersDataPort {
+  constructor(private readonly rows: readonly SecoWorkerRow[]) {}
+  load(): Promise<readonly SecoWorkerRow[]> {
+    return Promise.resolve(this.rows);
+  }
+}
+
+export class StubSecoMissionsDataPort implements SecoMissionsDataPort {
+  constructor(private readonly rows: readonly SecoMissionRow[]) {}
+  load(): Promise<readonly SecoMissionRow[]> {
+    return Promise.resolve(this.rows);
+  }
+}
+
+export class StubSecoContractsDataPort implements SecoContractsDataPort {
+  constructor(private readonly rows: readonly SecoContractRow[]) {}
+  load(): Promise<readonly SecoContractRow[]> {
+    return Promise.resolve(this.rows);
+  }
+}
+
+export class StubSecoTimesheetsDataPort implements SecoTimesheetsDataPort {
+  constructor(private readonly rows: readonly SecoTimesheetRow[]) {}
+  load(): Promise<readonly SecoTimesheetRow[]> {
+    return Promise.resolve(this.rows);
+  }
+}
+
+export class StubSecoLseInfoPort implements SecoLseInfoPort {
+  constructor(private readonly info: SecoLseInfo) {}
+  load(): Promise<SecoLseInfo> {
+    return Promise.resolve(this.info);
+  }
+}
+
+export class InMemorySecoExportAuditLogger implements SecoExportAuditLogger {
+  readonly entries: {
+    readonly agencyId: string;
+    readonly actorUserId: string;
+    readonly actorIp?: string;
+    readonly range: SecoExportRange;
+    readonly generatedAtIso: string;
+    readonly stats: { readonly workersCount: number; readonly timesheetsCount: number };
+  }[] = [];
+
+  recordExport(entry: {
+    agencyId: string;
+    actorUserId: string;
+    actorIp?: string;
+    range: SecoExportRange;
+    generatedAtIso: string;
+    stats: { workersCount: number; timesheetsCount: number };
+  }): Promise<void> {
+    this.entries.push({ ...entry });
+    return Promise.resolve();
+  }
+}
