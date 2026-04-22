@@ -15,6 +15,13 @@ describe('uiCanAccess', () => {
     expect(uiCanAccess('viewer', 'worker:read')).toBe(true);
     expect(uiCanAccess('viewer', 'worker:write')).toBe(false);
   });
+
+  it('dispatcher peut read+write timesheets, viewer peut seulement read', () => {
+    expect(uiCanAccess('dispatcher', 'timesheet:read')).toBe(true);
+    expect(uiCanAccess('dispatcher', 'timesheet:write')).toBe(true);
+    expect(uiCanAccess('viewer', 'timesheet:read')).toBe(true);
+    expect(uiCanAccess('viewer', 'timesheet:write')).toBe(false);
+  });
 });
 
 describe('visibleNavItems', () => {
