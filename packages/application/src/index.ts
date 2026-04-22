@@ -11,4 +11,5 @@ export * from './workers/documents/validate-document.use-case.js';
 export * from './workers/documents/archive-document.use-case.js';
 export * from './workers/documents/list-documents.use-case.js';
 export * from './workers/documents/get-download-url.use-case.js';
+export * from './workers/documents/apply-scan-result.use-case.js';
 export * from './workers/documents/test-helpers.js';

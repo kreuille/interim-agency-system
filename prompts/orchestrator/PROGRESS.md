@@ -13,7 +13,7 @@
 - **Prompts complétés** : 5 / 53
 - **Prompts détaillés prêts à exécuter** : 48 sprint + 5 OPS = **53/53** 🎉
 - **Blockers ouverts** : 2 (BLOCKER-001 sandbox MP, BLOCKER-002 autorisation LSE — externes, non-dev)
-- **Dette technique** : 15 ouvertes / 4 fermées (DETTE-010, 017, 018, 019)
+- **Dette technique** : 11 ouvertes / 8 fermées (DETTE-010/017/018/019/020/021/022/023)
 - **Vélocité observée** : — (premier prompt tout juste fini)
 - **Skills disponibles** : 32 (voir `skills/README.md`)
 - **Documents de référence** : 10 (brief, spec, plan, archi, risques, rôles, registre nLPD, pr-template, ADR-0001, skills README)

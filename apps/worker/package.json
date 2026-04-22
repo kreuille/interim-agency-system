@@ -10,7 +10,11 @@
     "start": "node dist/main.js"
   },
   "dependencies": {
-    "@interim/shared": "workspace:*"
+    "@interim/application": "workspace:*",
+    "@interim/domain": "workspace:*",
+    "@interim/shared": "workspace:*",
+    "bullmq": "^5.34.5",
+    "ioredis": "^5.4.1"
   },
   "devDependencies": {
     "@types/node": "^20.17.0",
