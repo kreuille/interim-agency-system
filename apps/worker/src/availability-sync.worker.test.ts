@@ -7,6 +7,7 @@ import {
   ScriptedAvailabilityPushPort,
   type AvailabilityOutboxRow,
 } from '@interim/application';
+import { NIGHTLY_DRAIN_CRON, NIGHTLY_DRAIN_JOB_ID } from './availability-sync.worker.js';
 
 const NOW = new Date('2026-04-22T08:00:00Z');
 
@@ -94,5 +95,15 @@ describe('availability-sync drain logic', () => {
     const r3 = await drain.execute();
     expect(r3.succeeded).toBe(1);
     expect(port.calls).toHaveLength(2);
+  });
+});
+
+describe('nightly drain config', () => {
+  it('expose un cron pattern à 02:00 UTC (≈ 04:00 Europe/Zurich)', () => {
+    expect(NIGHTLY_DRAIN_CRON).toBe('0 2 * * *');
+  });
+
+  it('expose un jobId figé pour éviter les répétitions concurrentes au redéploy', () => {
+    expect(NIGHTLY_DRAIN_JOB_ID).toBe('nightly-drain');
   });
 });

@@ -65,3 +65,30 @@ export function createAvailabilitySyncWorker(
 export function createAvailabilitySyncQueue(connection: Redis): Queue<AvailabilitySyncJob> {
   return new Queue<AvailabilitySyncJob>(AVAILABILITY_SYNC_QUEUE_NAME, { connection });
 }
+
+/**
+ * Cron BullMQ "nightly" : déclenche un drain complet de l'outbox tous
+ * les jours à ~04:00 Europe/Zurich. Filet de sécurité contre les rows
+ * qui auraient échappé au push realtime (worker offline pendant la nuit,
+ * MP indisponible longtemps, etc.).
+ *
+ * `jobId` figé → un seul cron actif même après redéploys multiples.
+ *
+ * Note tz : on planifie en UTC à 02:00 (= 04:00 Europe/Zurich en heure
+ * d'été, 03:00 en heure d'hiver). Pour une heure CH stable il faudra
+ * un scheduler tz-aware (ex. `bullmq-cron-tz` ou cron extérieur).
+ * Le drift d'1h en hiver est jugé acceptable pour ce filet de sécurité.
+ */
+export const NIGHTLY_DRAIN_JOB_ID = 'nightly-drain';
+export const NIGHTLY_DRAIN_CRON = '0 2 * * *';
+
+export async function scheduleNightlyDrain(queue: Queue<AvailabilitySyncJob>): Promise<void> {
+  await queue.add(
+    AVAILABILITY_SYNC_QUEUE_NAME,
+    { tick: 'nightly' },
+    {
+      jobId: NIGHTLY_DRAIN_JOB_ID,
+      repeat: { pattern: NIGHTLY_DRAIN_CRON },
+    },
+  );
+}
