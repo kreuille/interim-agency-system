@@ -11,8 +11,12 @@ import type {
   DocumentAuditEntry,
   DocumentAuditLogger,
   ObjectStorage,
+  OcrExtractor,
+  ScanQueue,
+  ScanRequest,
   UploadedBlob,
 } from './ports.js';
+import type { ApplyScanResultUseCase } from './apply-scan-result.use-case.js';
 
 export class InMemoryDocumentRepository implements DocumentRepository {
   private readonly store = new Map<string, WorkerDocument>();
@@ -87,5 +91,57 @@ export class InMemoryDocumentAuditLogger implements DocumentAuditLogger {
   record(entry: DocumentAuditEntry): Promise<void> {
     this.entries.push(entry);
     return Promise.resolve();
+  }
+}
+
+/**
+ * Pour les tests : appelle immédiatement le scanner + ApplyScanResultUseCase
+ * dès qu'une demande est enqueue. Conserve l'ergonomie des tests existants
+ * tout en utilisant le port `ScanQueue`.
+ */
+export class InlineScanQueue implements ScanQueue {
+  readonly requests: ScanRequest[] = [];
+
+  constructor(
+    private readonly scanner: AntivirusScanner,
+    private readonly apply: ApplyScanResultUseCase,
+  ) {}
+
+  async enqueue(request: ScanRequest): Promise<void> {
+    this.requests.push(request);
+    // Charger le body depuis le storage n'est pas nécessaire ici : on ne
+    // re-télécharge pas ; le scanner reçoit le buffer original. Pour le mode
+    // inline, on utilise un buffer vide (le stub StubAntivirusScanner ne
+    // l'examine pas). En prod, le ClamavAntivirusScanner re-télécharge depuis
+    // GCS via le `fileKey`.
+    const verdict = await this.scanner.scan(Buffer.alloc(0));
+    await this.apply.execute({
+      agencyId: request.agencyId,
+      documentId: request.documentId,
+      verdict,
+    });
+  }
+}
+
+export class RecordingScanQueue implements ScanQueue {
+  readonly requests: ScanRequest[] = [];
+
+  enqueue(request: ScanRequest): Promise<void> {
+    this.requests.push(request);
+    return Promise.resolve();
+  }
+}
+
+export class NoOpOcrExtractor implements OcrExtractor {
+  extractDates(_input: { mimeType: string; body: Buffer }): Promise<{ expiresAt?: Date }> {
+    return Promise.resolve({});
+  }
+}
+
+export class FakeOcrExtractor implements OcrExtractor {
+  constructor(private readonly result: { expiresAt?: Date }) {}
+
+  extractDates(_input: { mimeType: string; body: Buffer }): Promise<{ expiresAt?: Date }> {
+    return Promise.resolve(this.result);
   }
 }

@@ -184,6 +184,49 @@ describe('Workers HTTP', () => {
     });
   });
 
+  describe('edge cases (DETTE-023 coverage)', () => {
+    beforeEach(() => {
+      ({ app } = buildApp(() => ({
+        agencyId: 'agency-a',
+        userId: 'user-admin',
+        role: 'agency_admin',
+      })));
+    });
+
+    it('DELETE /workers/:id returns 404 for unknown id', async () => {
+      const response = await request(app).delete('/api/v1/workers/ghost');
+      expect(response.status).toBe(404);
+    });
+
+    it('PUT /workers/:id returns 404 for unknown id', async () => {
+      const response = await request(app).put('/api/v1/workers/ghost').send({ firstName: 'X' });
+      expect(response.status).toBe(404);
+    });
+
+    it('PUT /workers/:id returns 400 on invalid body (canton too long)', async () => {
+      await request(app).post('/api/v1/workers').send(validBody);
+      const response = await request(app)
+        .put('/api/v1/workers/worker-1')
+        .send({ residenceCanton: 'INVALID_CANTON' });
+      expect(response.status).toBe(400);
+    });
+
+    it('GET /workers returns 400 when limit query is out of range', async () => {
+      const response = await request(app).get('/api/v1/workers?limit=999');
+      expect(response.status).toBe(400);
+    });
+
+    it('GET /workers passes through search + cursor + includeArchived', async () => {
+      await request(app).post('/api/v1/workers').send(validBody);
+      const response = await request(app).get(
+        '/api/v1/workers?search=Dupont&includeArchived=false&limit=10',
+      );
+      expect(response.status).toBe(200);
+      const body = response.body as { items: unknown[] };
+      expect(body.items).toHaveLength(1);
+    });
+  });
+
   describe('cross-tenant isolation', () => {
     it('agency B cannot see agency A worker', async () => {
       const { app: appA } = buildApp(() => ({
