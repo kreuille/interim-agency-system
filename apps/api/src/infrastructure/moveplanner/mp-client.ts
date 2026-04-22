@@ -1,6 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import type { Result } from '@interim/shared';
 import { CircuitOpenError, type CircuitBreaker } from '../reliability/circuit-breaker.js';
+import {
+  mpRequestDurationSeconds,
+  mpRequestTotal,
+  pathTemplate,
+  statusBucket,
+} from '../observability/metrics.js';
+import { traceMpCall } from '../observability/tracing.js';
 
 /**
  * Erreurs structurées renvoyées par le client MP.
@@ -223,6 +230,27 @@ export class MpClient {
     opts: MpRequestOptions,
     idempotencyKey: string | undefined,
   ): Promise<Result<T, MpError>> {
+    const endpoint = pathTemplate(opts.path);
+    return traceMpCall(
+      { endpoint, method: opts.method },
+      () => this.doFetchInstrumented<T>(opts, idempotencyKey, endpoint),
+      (result) => {
+        if (result.ok) return { ok: true };
+        const out: { ok: boolean; status?: number; errorKind?: string } = {
+          ok: false,
+          errorKind: result.error.kind,
+        };
+        if (result.error.status !== undefined) out.status = result.error.status;
+        return out;
+      },
+    );
+  }
+
+  private async doFetchInstrumented<T>(
+    opts: MpRequestOptions,
+    idempotencyKey: string | undefined,
+    endpoint: string,
+  ): Promise<Result<T, MpError>> {
     const url = `${this.baseUrl}${opts.path}`;
     const headers: Record<string, string> = {
       'content-type': 'application/json',
@@ -235,6 +263,7 @@ export class MpClient {
       controller.abort();
     }, this.timeoutMs);
 
+    const startMs = Date.now();
     try {
       const response = await this.fetchFn(url, {
         method: opts.method,
@@ -244,6 +273,12 @@ export class MpClient {
       });
       const text = await response.text();
       const parsed = parseBody(text);
+      const bucket = statusBucket(response.status);
+      mpRequestTotal.inc({ endpoint, method: opts.method, status: bucket });
+      mpRequestDurationSeconds.observe(
+        { endpoint, method: opts.method, status: bucket },
+        (Date.now() - startMs) / 1000,
+      );
       if (response.status >= 200 && response.status < 300) {
         return { ok: true, value: parsed as T };
       }
@@ -258,6 +293,11 @@ export class MpClient {
       };
     } catch (err) {
       const message = err instanceof Error ? err.message : 'unknown';
+      mpRequestTotal.inc({ endpoint, method: opts.method, status: 'error' });
+      mpRequestDurationSeconds.observe(
+        { endpoint, method: opts.method, status: 'error' },
+        (Date.now() - startMs) / 1000,
+      );
       return {
         ok: false,
         error: new MpError('network', undefined, `MP fetch failed: ${message}`),

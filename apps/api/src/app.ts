@@ -28,6 +28,7 @@ import { createWorkersRouter } from './infrastructure/http/controllers/workers.c
 import { createWorkerDocumentsRouter } from './infrastructure/http/controllers/worker-documents.controller.js';
 import { createAvailabilityRouter } from './infrastructure/http/controllers/availability.controller.js';
 import { createProposalsRouter } from './infrastructure/http/controllers/proposals.controller.js';
+import { metricsRegistry } from './infrastructure/observability/metrics.js';
 import {
   createMoveplannerWebhookRouter,
   type MoveplannerWebhookHandler,
@@ -87,6 +88,16 @@ export function createApp(deps?: AppDeps): Express {
       status: 'ok',
       version: process.env.VERSION ?? '0.0.0',
     });
+  });
+
+  // Prometheus scraping endpoint (pas sous /api/v1 — accessible sans auth
+  // car scrapé par le side-car Prometheus du pod, via réseau privé).
+  app.get('/metrics', (_req: Request, res: Response) => {
+    res.set('content-type', metricsRegistry.contentType);
+    metricsRegistry
+      .metrics()
+      .then((m) => res.status(200).send(m))
+      .catch(() => res.status(500).send('metrics_error'));
   });
 
   if (deps) {
