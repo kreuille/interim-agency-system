@@ -39,3 +39,6 @@ export * from './payroll/payslip-engine.js';
 export * from './payroll/payslip-document.js';
 export * from './payments/pain001-types.js';
 export * from './payments/pain001-builder.js';
+export * from './invoicing/qr-reference.js';
+export * from './invoicing/invoice.js';
+export * from './invoicing/invoice-repository.js';

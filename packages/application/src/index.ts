@@ -82,3 +82,5 @@ export * from './timesheets/timesheet-confirmation.handler.js';
 export * from './timesheets/notifier-ports.js';
 export * from './timesheets/cct-minimum-lookup.port.js';
 export * from './timesheets/test-helpers.js';
+export * from './invoicing/generate-invoice.use-case.js';
+export * from './invoicing/test-helpers.js';
