@@ -146,6 +146,20 @@ enum AvailabilityOutboxStatus {
   DEAD
 }
 
+enum SmsProvider {
+  SWISSCOM
+  TWILIO
+  NOOP
+}
+
+enum SmsStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  FAILED
+  OPT_OUT
+}
+
 // ============================================================================
 // Agency (tenant root)
 // ============================================================================
@@ -655,6 +669,37 @@ model OutboxAvailabilityPush {
   @@index([status, nextAttemptAt])
   @@index([agencyId, workerId, status])
   @@map("outbox_availability_push")
+}
+
+// Journal d'envoi SMS (audit + corrélation webhook delivery).
+model SmsLog {
+  id                 String      @id @default(uuid()) @db.Uuid
+  agencyId           String      @db.Uuid
+  toMasked           String
+  templateCode       String
+  provider           SmsProvider
+  providerMessageId  String?
+  status             SmsStatus   @default(QUEUED)
+  sentAt             DateTime?   @db.Timestamptz(6)
+  deliveredAt        DateTime?   @db.Timestamptz(6)
+  failureReason      String?
+  createdAt          DateTime    @default(now()) @db.Timestamptz(6)
+
+  // Lookup par providerMessageId pour le webhook delivery callback.
+  @@unique([provider, providerMessageId])
+  @@index([agencyId, createdAt])
+  @@map("sms_logs")
+}
+
+// Numéros opt-out (mot-clé STOP reçu).
+model SmsOptOut {
+  id         String   @id @default(uuid()) @db.Uuid
+  agencyId   String   @db.Uuid
+  phoneE164  String
+  optedOutAt DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([agencyId, phoneE164])
+  @@map("sms_opt_outs")
 }
 
 // Snapshot persistant de l'aggregate WorkerAvailability (1 par
