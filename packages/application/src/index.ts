@@ -53,3 +53,6 @@ export * from './sms/rate-limiter.js';
 export * from './sms/send-sms.use-case.js';
 export * from './sms/handle-opt-out.use-case.js';
 export * from './sms/test-helpers.js';
+export * from './contracts/compliance-ports.js';
+export * from './contracts/generate-mission-contract.use-case.js';
+export * from './contracts/test-helpers.js';
