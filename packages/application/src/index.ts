@@ -45,6 +45,7 @@ export * from './missions/assign-routing-mode.use-case.js';
 export * from './missions/accept-on-behalf.use-case.js';
 export * from './missions/refuse-on-behalf.use-case.js';
 export * from './missions/worker-assignment-response.handlers.js';
+export * from './missions/proposal-reminder.use-case.js';
 export * from './missions/test-helpers.js';
 export * from './sms/sms-sender.js';
 export * from './sms/template-renderer.js';

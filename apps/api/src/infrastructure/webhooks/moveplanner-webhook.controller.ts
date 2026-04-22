@@ -25,8 +25,8 @@ import type { WebhookSecretProvider } from './secret-rotation.service.js';
 export interface MoveplannerWebhookHandler {
   /**
    * Appelé seulement après vérification HMAC réussie. Reçoit le payload
-   * parsé + les headers MP utiles (eventId, timestamp, eventType,
-   * signature, secretVersion).
+   * parsé + les headers MP utiles + optionnellement `agencyId` extrait
+   * de l'URL multi-tenant (`/webhooks/moveplanner/:agencyId`).
    * Doit être idempotent — l'idempotence par `eventId` est implémentée
    * en A3.2 (persistance inbound).
    */
@@ -37,6 +37,7 @@ export interface MoveplannerWebhookHandler {
     readonly signature: string;
     readonly secretVersion: 'current' | 'previous';
     readonly payload: unknown;
+    readonly agencyId?: string;
   }): Promise<void>;
 }
 
@@ -47,6 +48,12 @@ export interface WebhookControllerDeps {
   readonly now?: () => Date;
   /** Override le logger sécu. Default : console.warn. */
   readonly securityLog?: (event: SecurityLogEntry) => void;
+  /**
+   * Si `true`, accepte un path `/:agencyId` après la racine et le
+   * passe au handler (multi-tenant). Sinon, monte uniquement la racine
+   * (single-tenant, agencyId injecté côté handler).
+   */
+  readonly multiTenant?: boolean;
 }
 
 export interface SecurityLogEntry {
@@ -87,6 +94,15 @@ export function createMoveplannerWebhookRouter(deps: WebhookControllerDeps): Rou
   router.post('/', express.raw({ type: 'application/json', limit: MAX_BODY_BYTES }), (req, res) => {
     void handle(req, res, deps, now, log);
   });
+  if (deps.multiTenant) {
+    router.post(
+      '/:agencyId',
+      express.raw({ type: 'application/json', limit: MAX_BODY_BYTES }),
+      (req, res) => {
+        void handle(req, res, deps, now, log);
+      },
+    );
+  }
 
   return router;
 }
@@ -164,6 +180,10 @@ async function handle(
     return;
   }
 
+  // En multi-tenant, l'URL contient `:agencyId`. Le handler reçoit alors
+  // l'agencyId (sinon il fallback sur sa config single-tenant).
+  const agencyId = typeof req.params.agencyId === 'string' ? req.params.agencyId : undefined;
+
   try {
     await deps.handler.handle({
       eventId,
@@ -172,6 +192,7 @@ async function handle(
       signature,
       secretVersion: result.secretVersion,
       payload,
+      ...(agencyId !== undefined ? { agencyId } : {}),
     });
     res.status(200).json({ accepted: true });
   } catch (err) {
