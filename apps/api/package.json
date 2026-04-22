@@ -24,6 +24,7 @@
   },
   "dependencies": {
     "@interim/application": "workspace:*",
+    "@interim/contracts": "workspace:*",
     "@interim/domain": "workspace:*",
     "@interim/shared": "workspace:*",
     "@prisma/client": "^5.22.0",
