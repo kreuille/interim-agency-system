@@ -1,6 +1,6 @@
 # PROGRESS.md — État d'avancement du projet
 
-> **Dernière mise à jour** : 2026-04-21 22:45 — DETTE-010/017/018/019 fermées. 140 tests verts, coverage enforcement CI actif.
+> **Dernière mise à jour** : 2026-04-22 07:05 — DETTE-020/021/022/023 fermées. Async scan BullMQ, GCS CMEK, OCR port. 200 tests verts.
 > **Source de vérité** pour l'orchestrateur. **Ne jamais** le mettre à jour à la main sans avoir suivi le protocole `ORCHESTRATOR.md`.
 
 ---
@@ -194,6 +194,10 @@ Décisions prises et non renégociables sans ADR. Mettre à jour au fil de l'eau
 | ~~DETTE-017~~ | 2026-04-21 | A1.1 | ~~`Idempotency-Key` cache inbound pour POST/PUT workers~~ — **fermée 2026-04-21** : middleware + Prisma store + 7 tests + wired dans `/api/v1` | ~~M~~ | ✅ |
 | ~~DETTE-018~~ | 2026-04-21 | A1.1 | ~~Coverage CI enforcement~~ — **fermée 2026-04-21** : `@vitest/coverage-v8` + seuils par workspace + job CI `test-coverage` avec upload artifact HTML | ~~M~~ | ✅ |
 | ~~DETTE-019~~ | 2026-04-21 | A1.1 | ~~Prisma middleware tenant-injection~~ — **fermée 2026-04-21** : `installTenantGuard` via `$extends` + `assertTenantConsistent` fonction pure + 7 tests. Complète ~~DETTE-010~~ également | ~~H~~ | ✅ |
+| ~~DETTE-020~~ | 2026-04-21 | A1.2 | ~~Wire `ObjectStorage` réel GCP Cloud Storage CMEK~~ — **fermée 2026-04-22** : adapter `GcsObjectStorage` (Storage SDK + `kmsKeyName` CMEK + signed URL V4). Wire prod conditionnel via `OBJECT_STORAGE_PROVIDER=gcs`. Activation effective attend DETTE-015 | ~~M~~ | ✅ |
+| ~~DETTE-021~~ | 2026-04-21 | A1.2 | ~~Wire `AntivirusScanner` réel + queue BullMQ~~ — **fermée 2026-04-22** : refactor scan en async via port `ScanQueue` + `ApplyScanResultUseCase`. Adapters `ClamavAntivirusScanner` (TCP clamd 3310) + `BullMqScanQueue`. ClamAV ajouté docker-compose. Worker consumer `apps/worker/src/scan-worker.ts` | ~~M~~ | ✅ |
+| ~~DETTE-022~~ | 2026-04-21 | A1.2 | ~~OCR best-effort pour pré-remplir `expiresAt`~~ — **fermée 2026-04-22** : port `OcrExtractor` + `NoOpOcrExtractor` adapter (no-op). Use case appelle l'OCR si `expiresAt` non fourni. Tesseract en sprint A.6 si besoin métier confirmé | ~~M~~ | ✅ |
+| ~~DETTE-023~~ | 2026-04-21 | A1.2 | ~~Durcir coverage api branches 65% → 70%~~ — **fermée 2026-04-22** : seuils api remontés à 80% lines / 70% branches / 80% statements / 80% functions. 10 tests edge-cases ajoutés. Coverage actuelle : 87.24% lines / 75.24% branches | ~~M~~ | ✅ |
 
 ---
 
