@@ -6,6 +6,8 @@ import {
   type MissionProposalRepository,
   type ListProposalsQuery,
 } from '@interim/domain';
+import type { Result } from '@interim/shared';
+import { ProposalMpError, type ProposalMpResponsePort } from './proposal-mp-port.js';
 
 export class InMemoryMissionProposalRepository implements MissionProposalRepository {
   private readonly byId = new Map<string, MissionProposal>();
@@ -52,5 +54,64 @@ export class InMemoryMissionProposalRepository implements MissionProposalReposit
 
   size(): number {
     return this.byId.size;
+  }
+}
+
+/**
+ * Port MP scriptable : produit pour chaque appel le résultat
+ * pré-programmé. Permet de tester les cas ok / transient / permanent.
+ */
+export class ScriptedProposalMpResponsePort implements ProposalMpResponsePort {
+  readonly acceptCalls: { externalRequestId: string; idempotencyKey: string }[] = [];
+  readonly refuseCalls: {
+    externalRequestId: string;
+    idempotencyKey: string;
+    reason: string;
+  }[] = [];
+
+  constructor(
+    private readonly outcomes: readonly (
+      | { kind: 'ok' }
+      | { kind: 'transient' }
+      | { kind: 'permanent' }
+    )[] = [{ kind: 'ok' }],
+    private callCount = 0,
+  ) {}
+
+  notifyAccepted(input: {
+    externalRequestId: string;
+    idempotencyKey: string;
+    notes?: string;
+  }): Promise<Result<{ recorded: true }, ProposalMpError>> {
+    this.acceptCalls.push({
+      externalRequestId: input.externalRequestId,
+      idempotencyKey: input.idempotencyKey,
+    });
+    return Promise.resolve(this.consumeOutcome());
+  }
+
+  notifyRefused(input: {
+    externalRequestId: string;
+    idempotencyKey: string;
+    reason: string;
+  }): Promise<Result<{ recorded: true }, ProposalMpError>> {
+    this.refuseCalls.push({
+      externalRequestId: input.externalRequestId,
+      idempotencyKey: input.idempotencyKey,
+      reason: input.reason,
+    });
+    return Promise.resolve(this.consumeOutcome());
+  }
+
+  private consumeOutcome(): Result<{ recorded: true }, ProposalMpError> {
+    const outcome = this.outcomes[Math.min(this.callCount, this.outcomes.length - 1)];
+    this.callCount += 1;
+    if (!outcome || outcome.kind === 'ok') {
+      return { ok: true, value: { recorded: true } };
+    }
+    return {
+      ok: false,
+      error: new ProposalMpError(outcome.kind, `${outcome.kind}_mp_error`),
+    };
   }
 }
