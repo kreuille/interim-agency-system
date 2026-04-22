@@ -56,6 +56,9 @@ importers:
       '@interim/application':
         specifier: workspace:*
         version: link:../../packages/application
+      '@interim/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       '@interim/domain':
         specifier: workspace:*
         version: link:../../packages/domain
