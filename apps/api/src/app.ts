@@ -1,19 +1,23 @@
 import express, { type Express, type Request, type Response } from 'express';
 import type {
+  AcceptOnBehalfUseCase,
   AddSlotUseCase,
   ArchiveDocumentUseCase,
   ArchiveWorkerUseCase,
+  AssignRoutingModeUseCase,
   GetDownloadUrlUseCase,
   GetWeekAvailabilityUseCase,
   GetWorkerUseCase,
   ListDocumentsUseCase,
   ListWorkersUseCase,
+  RefuseOnBehalfUseCase,
   RegisterWorkerUseCase,
   RemoveSlotUseCase,
   UpdateWorkerUseCase,
   UploadDocumentUseCase,
   ValidateDocumentUseCase,
 } from '@interim/application';
+import type { MissionProposalRepository } from '@interim/domain';
 import { createAuthMiddleware, type TokenVerifier } from './shared/middleware/auth.middleware.js';
 import { tenantMiddleware } from './shared/middleware/tenant.middleware.js';
 import {
@@ -23,6 +27,7 @@ import {
 import { createWorkersRouter } from './infrastructure/http/controllers/workers.controller.js';
 import { createWorkerDocumentsRouter } from './infrastructure/http/controllers/worker-documents.controller.js';
 import { createAvailabilityRouter } from './infrastructure/http/controllers/availability.controller.js';
+import { createProposalsRouter } from './infrastructure/http/controllers/proposals.controller.js';
 import {
   createMoveplannerWebhookRouter,
   type MoveplannerWebhookHandler,
@@ -50,6 +55,12 @@ export interface AppDeps {
     readonly add: AddSlotUseCase;
     readonly remove: RemoveSlotUseCase;
     readonly getWeek: GetWeekAvailabilityUseCase;
+  };
+  readonly proposals?: {
+    readonly repo: MissionProposalRepository;
+    readonly assignRouting: AssignRoutingModeUseCase;
+    readonly accept: AcceptOnBehalfUseCase;
+    readonly refuse: RefuseOnBehalfUseCase;
   };
   readonly webhooks?: {
     readonly secrets: WebhookSecretProvider;
@@ -89,6 +100,9 @@ export function createApp(deps?: AppDeps): Express {
     app.use('/api/v1/workers', createWorkersRouter(deps.workers));
     app.use('/api/v1/workers/:id/documents', createWorkerDocumentsRouter(deps.documents));
     app.use('/api/v1/workers/:id/availability', createAvailabilityRouter(deps.availability));
+    if (deps.proposals) {
+      app.use('/api/v1/proposals', createProposalsRouter(deps.proposals));
+    }
   }
 
   return app;
