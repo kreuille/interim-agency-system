@@ -23,6 +23,11 @@ import {
 import { createWorkersRouter } from './infrastructure/http/controllers/workers.controller.js';
 import { createWorkerDocumentsRouter } from './infrastructure/http/controllers/worker-documents.controller.js';
 import { createAvailabilityRouter } from './infrastructure/http/controllers/availability.controller.js';
+import {
+  createMoveplannerWebhookRouter,
+  type MoveplannerWebhookHandler,
+} from './infrastructure/webhooks/moveplanner-webhook.controller.js';
+import type { WebhookSecretProvider } from './infrastructure/webhooks/secret-rotation.service.js';
 
 export interface AppDeps {
   readonly tokenVerifier: TokenVerifier;
@@ -46,11 +51,24 @@ export interface AppDeps {
     readonly remove: RemoveSlotUseCase;
     readonly getWeek: GetWeekAvailabilityUseCase;
   };
+  readonly webhooks?: {
+    readonly secrets: WebhookSecretProvider;
+    readonly handler: MoveplannerWebhookHandler;
+  };
 }
 
 export function createApp(deps?: AppDeps): Express {
   const app = express();
   app.disable('x-powered-by');
+
+  // IMPORTANT : monter le router webhook AVANT `express.json()` pour
+  // préserver les bytes raw du body (HMAC computed over raw bytes).
+  // Le router utilise son propre `express.raw({ type: 'application/json' })`
+  // sur ses routes POST.
+  if (deps?.webhooks) {
+    app.use('/webhooks/moveplanner', createMoveplannerWebhookRouter(deps.webhooks));
+  }
+
   app.use(express.json({ limit: '1mb' }));
 
   app.get('/health', (_req: Request, res: Response) => {
