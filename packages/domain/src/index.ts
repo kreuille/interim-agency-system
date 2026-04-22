@@ -18,3 +18,5 @@ export * from './missions/mission-proposal.js';
 export * from './missions/mission-proposal-repository.js';
 export * from './contracts/mission-contract.js';
 export * from './contracts/mission-contract-repository.js';
+export * from './contracts/contract-template.js';
+export * from './contracts/templates-fr.js';

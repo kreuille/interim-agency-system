@@ -1,6 +1,8 @@
+import { createHash } from 'node:crypto';
 import type {
   AgencyId,
   ClientId,
+  ContractDocument,
   MissionContract,
   MissionContractId,
   MissionContractRepository,
@@ -17,6 +19,12 @@ import type {
   WorkPermitLookup,
   WorkPermitView,
 } from './compliance-ports.js';
+import type {
+  ContractPdfRenderer,
+  ContractPdfStorage,
+  RenderedContractPdf,
+  StoreContractPdfInput,
+} from './contract-pdf-ports.js';
 
 export class InMemoryMissionContractRepository implements MissionContractRepository {
   private readonly byId = new Map<string, MissionContract>();
@@ -85,5 +93,33 @@ export class StubClientProfileLookup implements ClientProfileLookup {
   constructor(private readonly view: ClientProfileView | undefined) {}
   findById(_a: AgencyId, _c: ClientId): Promise<ClientProfileView | undefined> {
     return Promise.resolve(this.view);
+  }
+}
+
+/**
+ * Renderer PDF déterministe pour tests : sérialise le ContractDocument
+ * en JSON et calcule un SHA-256 stable. Permet de tester la chaîne
+ * use case → renderer → storage sans dépendre de la lib PDF.
+ */
+export class StubContractPdfRenderer implements ContractPdfRenderer {
+  render(doc: ContractDocument): Promise<RenderedContractPdf> {
+    const json = JSON.stringify(doc);
+    const bytes = new TextEncoder().encode(json);
+    const sha256Hex = createHash('sha256').update(bytes).digest('hex');
+    return Promise.resolve({ bytes, sha256Hex });
+  }
+}
+
+export class InMemoryContractPdfStorage implements ContractPdfStorage {
+  readonly stored = new Map<string, { bytes: Uint8Array; sha256Hex: string }>();
+
+  store(input: StoreContractPdfInput): Promise<{ key: string }> {
+    const key = `mem://${input.agencyId}/${input.contractId}.pdf`;
+    this.stored.set(key, { bytes: input.bytes, sha256Hex: input.sha256Hex });
+    return Promise.resolve({ key });
+  }
+
+  getDownloadUrl(key: string): Promise<string> {
+    return Promise.resolve(`https://example.test/download/${encodeURIComponent(key)}`);
   }
 }
