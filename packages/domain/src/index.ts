@@ -36,3 +36,4 @@ export * from './payroll/social-rates.js';
 export * from './payroll/lpp-calc.js';
 export * from './payroll/is-brackets.js';
 export * from './payroll/payslip-engine.js';
+export * from './payroll/payslip-document.js';
