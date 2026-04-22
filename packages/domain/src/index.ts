@@ -8,3 +8,6 @@ export * from './workers/documents/ports/document-repository.js';
 export * from './workers/documents/expiry-policy.js';
 export * from './clients/client.js';
 export * from './clients/client-repository.js';
+export * from './clients/client-contract.js';
+export * from './clients/rate-card.js';
+export * from './compliance/cct-minimum-rate.js';
