@@ -5,6 +5,44 @@
 
 ---
 
+## Session 2026-04-22 07:35 — Dettes 001/003/004/005/009/011/012 fermées en chaîne
+
+- **Opérateur** : Claude Code (Opus 4.7) — déclencheur : user "continue et resoud les dettes automatiquement"
+- **Branche** : `chore/resolve-dette-020-023` (continuée)
+
+### DETTE-005 + 009 + 012 — API container
+
+- `apps/api/Dockerfile` multi-stage : deps (pnpm install + prisma generate) → build → runtime tsx.
+- Bug Windows pnpm symlinks corrigé via `.dockerignore` racine. Smoke `/health` OK.
+- Service `api` profil `e2e` dans docker-compose. Job CI `build-api`.
+- DETTE-012 fermée par recouvrement.
+
+### DETTE-011 — Testcontainers Postgres
+
+- `vitest.integration.config.ts` séparé. `pnpm test:integration` + job CI.
+- 6 tests sur `PrismaWorkerRepository` (roundtrip, cross-tenant, unique, etc.).
+
+### DETTE-004 — Husky pre-commit typecheck
+
+- `pnpm typecheck` après `lint-staged`.
+
+### DETTE-003 — pnpm approve-builds
+
+- Whitelist `pnpm.onlyBuiltDependencies` en place depuis A0.5 → fermée par doc.
+
+### DETTE-001 — Composite TS reportée A.6
+
+### Métriques
+
+- Dettes fermées : 6 + 1 reportée. Restantes : 5 (006, 008, 014, 015, 016 — externes ou A.6).
+- Tests : 200 unit + 6 integration = **206**.
+
+### Note push
+
+Token `gh` toujours expiré. Commits locaux. Pour pousser : `gh auth login -h github.com` + `git push`.
+
+---
+
 ## Session 2026-04-21 22:50 — Dettes 017/018/019/010 fermées
 
 - **Opérateur** : Claude Code (Opus 4.7) — déclencheur : user "résoud dette 17 à 19"
