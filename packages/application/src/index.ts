@@ -15,6 +15,8 @@ export * from './workers/documents/apply-scan-result.use-case.js';
 export * from './workers/documents/test-helpers.js';
 export * from './compliance/document-alert.ports.js';
 export * from './compliance/scan-expiring-documents.use-case.js';
+export * from './compliance/dashboard-ports.js';
+export * from './compliance/get-compliance-dashboard.use-case.js';
 export * from './compliance/test-helpers.js';
 export * from './clients/client-audit-logger.js';
 export * from './clients/register-client.use-case.js';
