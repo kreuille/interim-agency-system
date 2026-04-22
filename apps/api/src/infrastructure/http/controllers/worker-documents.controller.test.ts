@@ -2,14 +2,17 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 import {
+  ApplyScanResultUseCase,
   ArchiveDocumentUseCase,
   GetDownloadUrlUseCase,
+  InlineScanQueue,
   InMemoryAuditLogger,
   InMemoryDocumentAuditLogger,
   InMemoryDocumentRepository,
   InMemoryObjectStorage,
   InMemoryWorkerRepository,
   ListDocumentsUseCase,
+  NoOpOcrExtractor,
   RegisterWorkerUseCase,
   StubAntivirusScanner,
   UploadDocumentUseCase,
@@ -39,11 +42,14 @@ async function buildApp(user: {
   const docAudit = new InMemoryDocumentAuditLogger();
   const register = new RegisterWorkerUseCase(workers, workerAudit, clock, () => 'worker-1');
   const docCounter = { n: 0 };
+  const apply = new ApplyScanResultUseCase(docs, storage, docAudit, clock);
+  const scanQueue = new InlineScanQueue(new StubAntivirusScanner('clean'), apply);
   const upload = new UploadDocumentUseCase(
     workers,
     docs,
     storage,
-    new StubAntivirusScanner('clean'),
+    scanQueue,
+    new NoOpOcrExtractor(),
     docAudit,
     clock,
     () => `doc-${String(++docCounter.n)}`,
@@ -86,7 +92,7 @@ describe('Worker documents HTTP', () => {
       setup = await buildApp({ agencyId: 'agency-a', userId: 'user-d', role: 'dispatcher' });
     });
 
-    it('POST uploads a PDF and returns 202', async () => {
+    it('POST uploads a PDF and returns 202 with pending scan status', async () => {
       const response = await request(setup.app)
         .post(`/api/v1/workers/${setup.workerId}/documents`)
         .field('type', 'permit_work')
@@ -94,7 +100,7 @@ describe('Worker documents HTTP', () => {
       expect(response.status).toBe(202);
       const body = response.body as { documentId: string; scanStatus: string };
       expect(body.documentId).toBe('doc-1');
-      expect(body.scanStatus).toBe('clean');
+      expect(body.scanStatus).toBe('pending');
     });
 
     it('POST rejects a binary disguised as PDF (mime_mismatch)', async () => {
@@ -208,6 +214,49 @@ describe('Worker documents HTTP', () => {
     it('GET is allowed', async () => {
       const response = await request(setup.app).get(`/api/v1/workers/${setup.workerId}/documents`);
       expect(response.status).toBe(200);
+    });
+  });
+
+  describe('edge cases (DETTE-023 coverage)', () => {
+    beforeEach(async () => {
+      setup = await buildApp({ agencyId: 'agency-a', userId: 'user-a', role: 'agency_admin' });
+    });
+
+    it('PATCH validate returns 404 for unknown doc', async () => {
+      const response = await request(setup.app)
+        .patch(`/api/v1/workers/${setup.workerId}/documents/ghost/validate`)
+        .send({});
+      expect(response.status).toBe(404);
+    });
+
+    it('DELETE returns 404 for unknown doc', async () => {
+      const response = await request(setup.app).delete(
+        `/api/v1/workers/${setup.workerId}/documents/ghost`,
+      );
+      expect(response.status).toBe(404);
+    });
+
+    it('GET /:docId/download returns 404 for unknown doc', async () => {
+      const response = await request(setup.app).get(
+        `/api/v1/workers/${setup.workerId}/documents/ghost/download`,
+      );
+      expect(response.status).toBe(404);
+    });
+
+    it('POST returns 401 when no user is attached', async () => {
+      const setupNoAuth = await buildApp({ agencyId: 'agency-a', userId: '', role: '' });
+      const response = await request(setupNoAuth.app)
+        .post(`/api/v1/workers/${setupNoAuth.workerId}/documents`)
+        .field('type', 'permit_work')
+        .attach('file', PDF, { filename: 'p.pdf', contentType: 'application/pdf' });
+      expect(response.status).toBe(401);
+    });
+
+    it('POST returns 400 when type is missing', async () => {
+      const response = await request(setup.app)
+        .post(`/api/v1/workers/${setup.workerId}/documents`)
+        .attach('file', PDF, { filename: 'p.pdf', contentType: 'application/pdf' });
+      expect(response.status).toBe(400);
     });
   });
 
