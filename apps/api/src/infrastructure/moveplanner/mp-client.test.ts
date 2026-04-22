@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { MpClient, MpError } from './mp-client.js';
 import { StaticApiKeyProvider } from './api-key-provider.js';
 import { InMemoryOutboundIdempotencyStore } from './outbound-idempotency.store.js';
+import { CircuitBreaker } from '../reliability/circuit-breaker.js';
 
 interface FetchCall {
   readonly url: string;
@@ -155,6 +156,61 @@ describe('MpClient', () => {
     await client.request({ method: 'GET', path: '/x' });
     const auth = (calls[0]?.init.headers as Record<string, string>).authorization;
     expect(auth).toBe('Bearer current-key');
+  });
+
+  it('circuit breaker ouvre après seuil 5xx → renvoie circuit_open sans appel', async () => {
+    const timeNow = 1_000_000;
+    const responses = Array.from({ length: 20 }, () => new Response('', { status: 500 }));
+    const { fetchFn, calls } = makeFetchMock(responses);
+    const breaker = new CircuitBreaker({
+      name: 'mp-test',
+      volumeThreshold: 3,
+      errorThresholdPercentage: 50,
+      resetTimeoutMs: 60_000,
+      now: () => timeNow,
+    });
+    const client = new MpClient({
+      baseUrl: 'https://mp.example.test',
+      apiKey: new StaticApiKeyProvider('k'),
+      idempotencyStore: new InMemoryOutboundIdempotencyStore(),
+      retryBackoffMs: [], // pas de retry interne pour isoler la logique CB
+      fetchFn,
+      sleepFn: vi.fn().mockResolvedValue(undefined),
+      circuitBreaker: breaker,
+    });
+    // 3 appels échec → ouvre
+    for (let i = 0; i < 3; i++) {
+      await client.request({ method: 'GET', path: '/x' });
+    }
+    expect(breaker.getState()).toBe('open');
+    const callsBefore = calls.length;
+    const result = await client.request({ method: 'GET', path: '/x' });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.kind).toBe('circuit_open');
+    expect(calls.length).toBe(callsBefore); // pas d'appel HTTP réel
+  });
+
+  it("circuit breaker ne s'ouvre pas sur 4xx (panne client, pas fournisseur)", async () => {
+    const responses = Array.from({ length: 10 }, () => new Response('', { status: 400 }));
+    const { fetchFn } = makeFetchMock(responses);
+    const breaker = new CircuitBreaker({
+      name: 'mp-test',
+      volumeThreshold: 3,
+      errorThresholdPercentage: 50,
+    });
+    const client = new MpClient({
+      baseUrl: 'https://mp.example.test',
+      apiKey: new StaticApiKeyProvider('k'),
+      idempotencyStore: new InMemoryOutboundIdempotencyStore(),
+      retryBackoffMs: [],
+      fetchFn,
+      sleepFn: vi.fn().mockResolvedValue(undefined),
+      circuitBreaker: breaker,
+    });
+    for (let i = 0; i < 5; i++) {
+      await client.request({ method: 'GET', path: '/x' });
+    }
+    expect(breaker.getState()).toBe('closed');
   });
 
   it('client_error mis en cache pour idempotency rejoue identique', async () => {
