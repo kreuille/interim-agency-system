@@ -4,8 +4,12 @@ import type {
   Invoice,
   InvoiceId,
   InvoiceRepository,
+  InvoiceReminderRecord,
+  InvoiceReminderRepository,
   InvoiceState,
+  ReminderLevel,
 } from '@interim/domain';
+import type { EmailReminderSender, RoleNotifier } from './send-invoice-reminder.use-case.js';
 
 /**
  * Repository in-memory pour tests. Séquentiel atomique via counter.
@@ -60,5 +64,86 @@ export class InMemoryInvoiceRepository implements InvoiceRepository {
 
   size(): number {
     return this.byId.size;
+  }
+}
+
+export class InMemoryInvoiceReminderRepository implements InvoiceReminderRepository {
+  readonly records: InvoiceReminderRecord[] = [];
+
+  insert(record: InvoiceReminderRecord): Promise<void> {
+    const duplicate = this.records.find(
+      (r) => r.invoiceId === record.invoiceId && r.level === record.level,
+    );
+    if (duplicate) {
+      throw new Error(
+        `InvoiceReminder duplicate (invoiceId, level) = (${record.invoiceId}, ${record.level})`,
+      );
+    }
+    this.records.push(record);
+    return Promise.resolve();
+  }
+
+  findByInvoice(
+    agencyId: AgencyId,
+    invoiceId: InvoiceId,
+  ): Promise<readonly InvoiceReminderRecord[]> {
+    return Promise.resolve(
+      this.records.filter((r) => r.agencyId === agencyId && r.invoiceId === invoiceId),
+    );
+  }
+
+  findPotentiallyOverdueInvoices(): Promise<readonly InvoiceId[]> {
+    // Stub simple : test se charge d'injecter via `registerOverdue` si besoin
+    return Promise.resolve([]);
+  }
+}
+
+export class StubEmailReminderSender implements EmailReminderSender {
+  readonly sent: {
+    readonly agencyId: string;
+    readonly invoiceId: string;
+    readonly invoiceNumber: string;
+    readonly level: ReminderLevel;
+    readonly daysOverdue: number;
+    readonly recipientEmail: string;
+    readonly totalTtcRappen: bigint;
+  }[] = [];
+  failNext?: string | undefined;
+
+  send(input: {
+    agencyId: string;
+    invoiceId: string;
+    invoiceNumber: string;
+    level: ReminderLevel;
+    daysOverdue: number;
+    recipientEmail: string;
+    totalTtcRappen: bigint;
+  }): Promise<{ messageId: string }> {
+    if (this.failNext) {
+      const reason = this.failNext;
+      this.failNext = undefined;
+      return Promise.reject(new Error(`simulated email failure: ${reason}`));
+    }
+    this.sent.push({ ...input });
+    return Promise.resolve({ messageId: `msg-${String(this.sent.length)}` });
+  }
+}
+
+export class InMemoryRoleNotifier implements RoleNotifier {
+  readonly notifications: {
+    readonly agencyId: string;
+    readonly invoiceId: string;
+    readonly level: ReminderLevel;
+    readonly roles: readonly string[];
+  }[] = [];
+
+  notifyRoles(input: {
+    agencyId: string;
+    invoiceId: string;
+    level: ReminderLevel;
+    roles: readonly string[];
+  }): Promise<void> {
+    this.notifications.push({ ...input });
+    return Promise.resolve();
   }
 }
