@@ -44,3 +44,7 @@ export * from './invoicing/invoice.js';
 export * from './invoicing/invoice-repository.js';
 export * from './invoicing/reminder-policy.js';
 export * from './invoicing/invoice-reminder.js';
+export * from './accounting/chart-of-accounts.js';
+export * from './accounting/accounting-entry.js';
+export * from './accounting/transaction-builders.js';
+export * from './accounting/csv-exporter.js';
