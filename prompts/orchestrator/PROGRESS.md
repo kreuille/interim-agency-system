@@ -1,6 +1,6 @@
 # PROGRESS.md — État d'avancement du projet
 
-> **Dernière mise à jour** : 2026-04-22 07:05 — DETTE-020/021/022/023 fermées. Async scan BullMQ, GCS CMEK, OCR port. 200 tests verts.
+> **Dernière mise à jour** : 2026-04-22 07:35 — Dettes 003/004/005/009/011/012 fermées (chaîne automatique). API Dockerfile + Testcontainers + husky typecheck. 200 unit + 6 integration tests. 5 dettes restantes (toutes externes ou ETA A.6).
 > **Source de vérité** pour l'orchestrateur. **Ne jamais** le mettre à jour à la main sans avoir suivi le protocole `ORCHESTRATOR.md`.
 
 ---
