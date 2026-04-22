@@ -148,8 +148,13 @@ describe('PrismaWorkerRepository (integration)', () => {
     await repo.save(worker);
 
     const pageDefault = await repo.list({ agencyId: AGENCY_A, limit: 50 });
-    expect(pageDefault.items).toHaveLength(1);
-    // ⚠️ Le repo Prisma actuel ne filtre pas par `archivedAt` en list (TODO A1.3
-    // pour aligner sur la sémantique InMemory). Voir DETTE follow-up à ouvrir.
+    expect(pageDefault.items).toHaveLength(0);
+
+    const pageWithArchived = await repo.list({
+      agencyId: AGENCY_A,
+      limit: 50,
+      includeArchived: true,
+    });
+    expect(pageWithArchived.items).toHaveLength(1);
   });
 });
