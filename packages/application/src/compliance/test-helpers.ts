@@ -97,3 +97,67 @@ function startOfDay(d: Date): Date {
   x.setUTCHours(0, 0, 0, 0);
   return x;
 }
+
+// =============================================================================
+// A6.1 Compliance dashboard — stubs des 5 ports
+// =============================================================================
+
+import type {
+  ActiveMissionsSnapshot,
+  CctSnapshot,
+  LseSnapshot,
+  NlpdSnapshot,
+  WorkerDocsSnapshot,
+} from '@interim/domain';
+import type {
+  ActiveMissionsStatusPort,
+  CctStatusPort,
+  LseStatusPort,
+  NlpdStatusPort,
+  WorkerDocsStatusPort,
+} from './dashboard-ports.js';
+
+export class StubLseStatusPort implements LseStatusPort {
+  constructor(private readonly snapshot: LseSnapshot) {}
+  load(): Promise<LseSnapshot> {
+    return Promise.resolve(this.snapshot);
+  }
+}
+
+export class StubCctStatusPort implements CctStatusPort {
+  constructor(private readonly snapshot: CctSnapshot) {}
+  load(): Promise<CctSnapshot> {
+    return Promise.resolve(this.snapshot);
+  }
+}
+
+export class StubWorkerDocsStatusPort implements WorkerDocsStatusPort {
+  constructor(private readonly snapshot: WorkerDocsSnapshot) {}
+  load(): Promise<WorkerDocsSnapshot> {
+    return Promise.resolve(this.snapshot);
+  }
+}
+
+export class StubActiveMissionsStatusPort implements ActiveMissionsStatusPort {
+  constructor(private readonly snapshot: ActiveMissionsSnapshot) {}
+  load(): Promise<ActiveMissionsSnapshot> {
+    return Promise.resolve(this.snapshot);
+  }
+}
+
+export class StubNlpdStatusPort implements NlpdStatusPort {
+  constructor(private readonly snapshot: NlpdSnapshot) {}
+  load(): Promise<NlpdSnapshot> {
+    return Promise.resolve(this.snapshot);
+  }
+}
+
+/**
+ * Variante qui simule une erreur de chargement (test du fallback critique).
+ */
+export class FailingLseStatusPort implements LseStatusPort {
+  constructor(private readonly reason: string) {}
+  load(): Promise<LseSnapshot> {
+    return Promise.reject(new Error(this.reason));
+  }
+}
