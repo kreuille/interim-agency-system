@@ -23,3 +23,8 @@ export * from './clients/archive-client.use-case.js';
 export * from './clients/get-client.use-case.js';
 export * from './clients/list-clients.use-case.js';
 export * from './clients/test-helpers.js';
+export * from './availability/availability-ports.js';
+export * from './availability/add-slot.use-case.js';
+export * from './availability/remove-slot.use-case.js';
+export * from './availability/get-week.use-case.js';
+export * from './availability/test-helpers.js';

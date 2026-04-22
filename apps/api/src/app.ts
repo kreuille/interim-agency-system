@@ -1,12 +1,15 @@
 import express, { type Express, type Request, type Response } from 'express';
 import type {
+  AddSlotUseCase,
   ArchiveDocumentUseCase,
   ArchiveWorkerUseCase,
   GetDownloadUrlUseCase,
+  GetWeekAvailabilityUseCase,
   GetWorkerUseCase,
   ListDocumentsUseCase,
   ListWorkersUseCase,
   RegisterWorkerUseCase,
+  RemoveSlotUseCase,
   UpdateWorkerUseCase,
   UploadDocumentUseCase,
   ValidateDocumentUseCase,
@@ -19,6 +22,7 @@ import {
 } from './shared/middleware/idempotency.middleware.js';
 import { createWorkersRouter } from './infrastructure/http/controllers/workers.controller.js';
 import { createWorkerDocumentsRouter } from './infrastructure/http/controllers/worker-documents.controller.js';
+import { createAvailabilityRouter } from './infrastructure/http/controllers/availability.controller.js';
 
 export interface AppDeps {
   readonly tokenVerifier: TokenVerifier;
@@ -36,6 +40,11 @@ export interface AppDeps {
     readonly archive: ArchiveDocumentUseCase;
     readonly list: ListDocumentsUseCase;
     readonly getUrl: GetDownloadUrlUseCase;
+  };
+  readonly availability: {
+    readonly add: AddSlotUseCase;
+    readonly remove: RemoveSlotUseCase;
+    readonly getWeek: GetWeekAvailabilityUseCase;
   };
 }
 
@@ -61,6 +70,7 @@ export function createApp(deps?: AppDeps): Express {
     });
     app.use('/api/v1/workers', createWorkersRouter(deps.workers));
     app.use('/api/v1/workers/:id/documents', createWorkerDocumentsRouter(deps.documents));
+    app.use('/api/v1/workers/:id/availability', createAvailabilityRouter(deps.availability));
   }
 
   return app;

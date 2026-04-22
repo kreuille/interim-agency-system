@@ -70,6 +70,7 @@ export default async function WorkersPage() {
               <th>Canton</th>
               <th>Inscrit le</th>
               <th>Statut</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -84,6 +85,9 @@ export default async function WorkersPage() {
                 <td>{w.residenceCanton}</td>
                 <td>{formatDateCh(w.createdAt)}</td>
                 <td>{w.archivedAt ? 'Archivé' : 'Actif'}</td>
+                <td>
+                  <Link href={`/dashboard/workers/${w.id}/availability`}>Disponibilités</Link>
+                </td>
               </tr>
             ))}
           </tbody>
