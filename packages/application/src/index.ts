@@ -37,3 +37,6 @@ export * from './webhooks/webhook-event-dispatcher.js';
 export * from './webhooks/record-inbound-webhook.use-case.js';
 export * from './webhooks/dispatch-inbound-webhook.use-case.js';
 export * from './webhooks/test-helpers.js';
+export * from './missions/record-mission-proposal.use-case.js';
+export * from './missions/worker-assignment-proposed.handler.js';
+export * from './missions/test-helpers.js';
