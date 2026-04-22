@@ -1,1 +1,14 @@
+#!/usr/bin/env sh
+# Pre-commit hook :
+# 1. lint-staged : ESLint + Prettier sur les fichiers stagés (rapide).
+# 2. typecheck workspace : empêche un commit qui casse les types ailleurs
+#    qu'à l'endroit qu'on touche (les imports cross-workspace sont fragiles).
+#
+# Si le typecheck devient lent (>15 s), passer en mode incremental via
+# `tsc --build --incremental` quand le mode composite sera réintroduit
+# (DETTE-001 — différée volontairement, voir PROGRESS.md §5).
+
+set -e
+
 pnpm exec lint-staged
+pnpm typecheck

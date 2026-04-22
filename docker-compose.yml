@@ -55,6 +55,35 @@ services:
       timeout: 5s
       retries: 10
 
+  api:
+    build:
+      context: .
+      dockerfile: ./apps/api/Dockerfile
+    container_name: interim-api
+    profiles: ['e2e']
+    ports:
+      - '3000:3000'
+    environment:
+      NODE_ENV: production
+      PORT: '3000'
+      DATABASE_URL: postgresql://dev:dev@postgres:5432/interim_dev?schema=public
+      REDIS_URL: redis://redis:6379
+      BULLMQ_REDIS_URL: redis://redis:6379
+      OBJECT_STORAGE_PROVIDER: memory
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: '3310'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:3000/health']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
   clamav:
     image: clamav/clamav:1.4
     container_name: interim-clamav
