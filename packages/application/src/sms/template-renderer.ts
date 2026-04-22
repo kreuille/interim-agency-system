@@ -18,35 +18,60 @@ const VAR_RE = /\{\{\s*([\w.]+)\s*\}\}/g;
 
 export interface RenderedSms {
   readonly templateCode: string;
+  readonly lang: SmsLang;
   readonly body: string;
 }
 
+/**
+ * Langues supportées. Priorité : fr (défaut Suisse romande) → de (Suisse
+ * alémanique) → it (Tessin) → en (fallback EU). Si un template n'existe
+ * que dans certaines langues, fallback vers fr par défaut.
+ */
+export const SMS_LANGS = ['fr', 'de', 'it', 'en'] as const;
+export type SmsLang = (typeof SMS_LANGS)[number];
+export const DEFAULT_SMS_LANG: SmsLang = 'fr';
+
 export interface SmsTemplate {
   readonly code: string;
+  readonly lang?: SmsLang; // default 'fr'
   readonly source: string;
   /** Limite hard du SMS (défaut 1600 = 10 segments). */
   readonly maxLength?: number;
 }
 
 export interface SmsTemplateRegistry {
-  get(code: string): SmsTemplate | undefined;
+  /**
+   * Renvoie le template pour `(code, lang)`. Si absent, fallback vers
+   * la langue par défaut (`fr`). `undefined` si ni la langue demandée ni
+   * la langue par défaut ne sont enregistrées.
+   */
+  get(code: string, lang?: SmsLang): SmsTemplate | undefined;
 }
 
 /**
  * Registry in-memory simple. Pour MVP, les templates sont chargés au
- * démarrage depuis `apps/api/src/templates/sms/*.mustache`. Une i18n
- * basique pourrait être ajoutée via `code:lang` (DETTE-039).
+ * démarrage depuis `apps/api/src/templates/sms/{code}.{lang}.mustache`
+ * ou `apps/api/src/templates/sms/{code}.mustache` (fr implicite).
  */
 export class InMemorySmsTemplateRegistry implements SmsTemplateRegistry {
   private readonly templates = new Map<string, SmsTemplate>();
 
   register(template: SmsTemplate): this {
-    this.templates.set(template.code, template);
+    const lang = template.lang ?? DEFAULT_SMS_LANG;
+    this.templates.set(this.key(template.code, lang), { ...template, lang });
     return this;
   }
 
-  get(code: string): SmsTemplate | undefined {
-    return this.templates.get(code);
+  get(code: string, lang?: SmsLang): SmsTemplate | undefined {
+    const requested = lang ?? DEFAULT_SMS_LANG;
+    return (
+      this.templates.get(this.key(code, requested)) ??
+      this.templates.get(this.key(code, DEFAULT_SMS_LANG))
+    );
+  }
+
+  private key(code: string, lang: SmsLang): string {
+    return `${code}::${lang}`;
   }
 }
 
@@ -54,8 +79,9 @@ export function renderTemplate(
   registry: SmsTemplateRegistry,
   code: string,
   data: Readonly<Record<string, unknown>>,
+  lang?: SmsLang,
 ): RenderedSms {
-  const template = registry.get(code);
+  const template = registry.get(code, lang);
   if (!template) throw new SmsError('template_not_found', `SMS template ${code} non trouvé`);
   const body = template.source.replace(VAR_RE, (_match, name: string) => {
     const value = lookup(data, name);
@@ -74,7 +100,11 @@ export function renderTemplate(
       `SMS rendu dépasse maxLength (${String(body.length)}/${String(maxLength)} chars)`,
     );
   }
-  return { templateCode: code, body };
+  return {
+    templateCode: code,
+    lang: template.lang ?? DEFAULT_SMS_LANG,
+    body,
+  };
 }
 
 function lookup(data: Readonly<Record<string, unknown>>, path: string): unknown {

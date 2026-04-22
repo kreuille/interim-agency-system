@@ -98,6 +98,26 @@ describe('proposals.controller', () => {
     expect((res.body as DtoResponse).id).toBe('mp-1');
   });
 
+  it('GET /api/v1/proposals/export.csv → CSV avec header + ligne', async () => {
+    const { app } = await setup();
+    const res = await request(app).get('/api/v1/proposals/export.csv');
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('text/csv');
+    expect(res.headers['content-disposition']).toContain('proposals.csv');
+    const csv = res.text;
+    expect(csv.split('\n')[0]).toContain('id,externalRequestId,state');
+    expect(csv).toContain('mp-1');
+    expect(csv).toContain('ACME');
+  });
+
+  it('GET /api/v1/proposals/export.csv → 403 si rôle insuffisant', async () => {
+    const { app } = await setup({
+      user: { agencyId: AGENCY, userId: 'a', role: 'payroll_officer' },
+    });
+    const res = await request(app).get('/api/v1/proposals/export.csv');
+    expect(res.status).toBe(403);
+  });
+
   it('POST /api/v1/proposals/:id/accept happy path', async () => {
     const { app, repo } = await setup({ mpOutcome: 'ok' });
     const res = await request(app)
