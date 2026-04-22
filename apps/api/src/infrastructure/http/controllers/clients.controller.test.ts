@@ -129,4 +129,54 @@ describe('Clients HTTP', () => {
       expect(r.status).toBe(200);
     });
   });
+
+  describe('edge cases (coverage)', () => {
+    beforeEach(() => {
+      ({ app } = buildApp(() => ({ agencyId: 'agency-a', userId: 'a', role: 'agency_admin' })));
+    });
+
+    it('POST 400 missing legalName', async () => {
+      const r = await request(app).post('/api/v1/clients').send({ paymentTermDays: 30 });
+      expect(r.status).toBe(400);
+    });
+
+    it('PUT 404 unknown id', async () => {
+      const r = await request(app).put('/api/v1/clients/ghost').send({ legalName: 'X' });
+      expect(r.status).toBe(404);
+    });
+
+    it('PUT 400 invalid IDE', async () => {
+      await request(app).post('/api/v1/clients').send(validBody);
+      const r = await request(app).put('/api/v1/clients/client-1').send({ ide: 'CHE-100.000.999' });
+      expect(r.status).toBe(400);
+    });
+
+    it('DELETE 404 unknown', async () => {
+      const r = await request(app).delete('/api/v1/clients/ghost');
+      expect(r.status).toBe(404);
+    });
+
+    it('GET list with status + search filters', async () => {
+      await request(app).post('/api/v1/clients').send(validBody);
+      const r = await request(app).get(
+        '/api/v1/clients?status=prospect&search=Acme&includeArchived=false&limit=10',
+      );
+      expect(r.status).toBe(200);
+    });
+
+    it('GET list 400 limit out of range', async () => {
+      const r = await request(app).get('/api/v1/clients?limit=999');
+      expect(r.status).toBe(400);
+    });
+
+    it('PUT can null IDE and creditLimit', async () => {
+      await request(app)
+        .post('/api/v1/clients')
+        .send({ ...validBody, creditLimitRappen: '5000000' });
+      const r = await request(app)
+        .put('/api/v1/clients/client-1')
+        .send({ ide: null, creditLimitRappen: null });
+      expect(r.status).toBe(200);
+    });
+  });
 });
