@@ -15,7 +15,14 @@ name: DR Roundtrip Test
 # Garde-fou : timeout 30 min (le test local prend < 5 min ; un test CI
 # qui dépasse 30 min trahit un blocage docker/network — fail-fast).
 #
-# Voir : `ops/backup/test-roundtrip.sh`, `docs/runbooks/disaster-recovery.md`,
+# Asserts CI explicites (DETTE-037 enhancements) :
+#   - shellcheck   : valide la syntaxe des scripts shell (lint)
+#   - assert_sha256: re-vérifie le sha256 du dernier dump produit
+#   - assert_age_header : vérifie l'en-tête "age-encryption.org/v1"
+#   - assert_rpo   : RPO ≤ 900s (15 min) — délai dump/upload
+#   - assert_rto   : RTO ≤ 14400s (4h) — durée roundtrip total
+#
+# Voir : `ops/backup/test-roundtrip.sh`, `docs/runbooks/disaster-recovery.md` §8,
 # `prompts/orchestrator/SESSION-LOG.md` § DETTE-037.
 
 on:
@@ -27,6 +34,10 @@ on:
         description: 'RTO budget en secondes (default 14400 = 4h)'
         required: false
         default: '14400'
+      rpo_budget_seconds:
+        description: 'RPO budget en secondes (default 900 = 15 min)'
+        required: false
+        default: '900'
       seed_rows_per_table:
         description: 'Nombre de rows seedées par table critique (test charge minimale)'
         required: false
@@ -47,10 +58,35 @@ permissions:
   contents: read
 
 jobs:
+  shellcheck:
+    name: shellcheck (lint scripts shell)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run shellcheck on ops/backup/*.sh
+        # Pin sur master comme recommandé par les maintainers (l'action
+        # n'a pas de releases taguées maintenues). On limite la portée
+        # à `ops/backup/` pour ne pas linter tout le monorepo.
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: './ops/backup'
+          severity: warning
+          # SC1091 : fichier sourcé non-traçable (faux positif sur _lib.sh
+          # car shellcheck ne suit pas les `source "${SCRIPT_DIR}/..."`)
+          ignore_paths: './ops/backup/test-keys'
+
   dr-roundtrip:
     name: DR roundtrip E2E (dump → restore → verify)
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    needs: shellcheck
+    env:
+      CI: 'true' # active le mode JSON Lines de _lib.sh log_msg
+      RPO_BUDGET_SECONDS: ${{ github.event.inputs.rpo_budget_seconds || '900' }}
+      RTO_BUDGET_SECONDS: ${{ github.event.inputs.rto_budget_seconds || '14400' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -93,14 +129,17 @@ jobs:
             up -d postgres postgres-dr
 
       - name: Wait for Postgres healthy (source + dr)
+        id: wait_pg
         run: |
           set -euo pipefail
+          DUMP_START_TS=$(date -u +%s)
           for i in $(seq 1 30); do
             src=$(docker inspect --format='{{.State.Health.Status}}' interim-postgres 2>/dev/null || echo unknown)
             dr=$(docker inspect --format='{{.State.Health.Status}}' interim-postgres-dr 2>/dev/null || echo unknown)
             echo "[wait] postgres=${src} postgres-dr=${dr}"
             if [ "${src}" = "healthy" ] && [ "${dr}" = "healthy" ]; then
               echo "Both Postgres healthy after ${i} attempts"
+              echo "dump_start_ts=${DUMP_START_TS}" >> "$GITHUB_OUTPUT"
               exit 0
             fi
             sleep 2
@@ -140,7 +179,92 @@ jobs:
              UNION ALL SELECT 'timesheets', count(*) FROM timesheets
              UNION ALL SELECT 'audit_logs', count(*) FROM audit_logs;"
 
+      - name: Run pg_dump.sh standalone (capture dump pour asserts)
+        # Étape dédiée pour produire UN dump dont on peut asserter le
+        # sha256 et le header age sans dépendre du test-roundtrip qui
+        # fait dump+restore d'un coup.
+        id: standalone_dump
+        env:
+          PG_HOST: localhost
+          PG_PORT: '5432'
+          PG_USER: dev
+          PG_DB: interim_dev
+          PGPASSWORD: dev
+          BACKUP_DEST: /tmp/dr-asserts
+          RETAIN_LOCAL: '5'
+        run: |
+          set -euo pipefail
+          AGE_RECIPIENT="$(cat ops/backup/test-keys/recipient.txt)"
+          export AGE_RECIPIENT
+          mkdir -p "${BACKUP_DEST}"
+          chmod +x ops/backup/*.sh
+          DUMP_START=$(date -u +%s)
+          bash ops/backup/pg_dump.sh
+          DUMP_END=$(date -u +%s)
+          DUMP_DURATION=$((DUMP_END - DUMP_START))
+          echo "dump_duration_seconds=${DUMP_DURATION}" >> "$GITHUB_OUTPUT"
+          # Récupère le dernier .age + .sha256 pour les asserts
+          # shellcheck disable=SC2012  # ls -t plus simple que find ici
+          LATEST_DUMP=$(ls -1t "${BACKUP_DEST}"/pgdump_*.dump.age | head -1)
+          echo "latest_dump=${LATEST_DUMP}" >> "$GITHUB_OUTPUT"
+          echo "[standalone_dump] produced ${LATEST_DUMP} in ${DUMP_DURATION}s"
+
+      - name: 'assert_sha256: vérifier intégrité du dump produit'
+        # Re-calcule sha256 sur le fichier .age et compare au .sha256
+        # généré par pg_dump.sh. C'est la même vérification que
+        # pg_restore.sh, mais explicitée comme step CI distinct pour
+        # alerter immédiatement si pg_dump.sh casse la cohérence.
+        run: |
+          set -euo pipefail
+          DUMP="${{ steps.standalone_dump.outputs.latest_dump }}"
+          SHA_FILE="${DUMP}.sha256"
+          [ -f "${DUMP}" ] || { echo "::error::dump file ${DUMP} introuvable"; exit 1; }
+          [ -f "${SHA_FILE}" ] || { echo "::error::sha256 file ${SHA_FILE} introuvable"; exit 1; }
+          EXPECTED="$(cat "${SHA_FILE}")"
+          ACTUAL="$(sha256sum "${DUMP}" | awk '{print $1}')"
+          if [ "${EXPECTED}" != "${ACTUAL}" ]; then
+            echo "::error::SHA256 mismatch — expected=${EXPECTED} actual=${ACTUAL}"
+            echo "Bit rot bucket OU pg_dump.sh produit un .sha256 incohérent."
+            exit 1
+          fi
+          echo "[assert_sha256] OK — ${ACTUAL}"
+
+      - name: 'assert_age_header: vérifier que le dump est bien chiffré age'
+        # Sanity check : les 22 premiers octets doivent être
+        # "age-encryption.org/v1" (cf. https://age-encryption.org/v1).
+        # Garde-fou contre une régression où pg_dump.sh oublierait
+        # l'étape de chiffrement et uploaderait du plain text.
+        run: |
+          set -euo pipefail
+          DUMP="${{ steps.standalone_dump.outputs.latest_dump }}"
+          MAGIC="$(head -c 22 "${DUMP}")"
+          if [ "${MAGIC}" != "age-encryption.org/v1" ]; then
+            echo "::error::age header invalide — got '${MAGIC}'"
+            echo "Le fichier n'est PAS chiffré age. Risque P1 : data leak si uploadé en prod."
+            exit 1
+          fi
+          echo "[assert_age_header] OK — header 'age-encryption.org/v1' présent"
+
+      - name: 'assert_rpo: dump duration ≤ RPO_BUDGET_SECONDS (15 min)'
+        # Le RPO mesure ici le temps entre un commit et sa présence
+        # sécurisée dans le dump (proxy : durée du pg_dump.sh complet,
+        # incluant chiffrement + upload). En prod, le WAL archiving
+        # toutes les 5 min compense entre 2 dumps quotidiens, mais on
+        # veut quand même qu'un dump ne mette pas plus de 15 min sur
+        # le seed CI minimal (sinon prod = problème).
+        run: |
+          set -euo pipefail
+          DUMP_DUR="${{ steps.standalone_dump.outputs.dump_duration_seconds }}"
+          BUDGET="${RPO_BUDGET_SECONDS}"
+          if [ "${DUMP_DUR}" -gt "${BUDGET}" ]; then
+            echo "::error::RPO budget exceeded — ${DUMP_DUR}s > ${BUDGET}s"
+            echo "Le pg_dump+chiffrement+upload met trop de temps. En prod, gap WAL > 15 min."
+            exit 1
+          fi
+          echo "[assert_rpo] OK — dump produced in ${DUMP_DUR}s (budget ${BUDGET}s)"
+
       - name: Run test-roundtrip.sh (E2E dump → restore → verify)
+        id: roundtrip
         env:
           AGE_RECIPIENT_FILE: ops/backup/test-keys/recipient.txt
           AGE_IDENTITY_FILE: ops/backup/test-keys/identity.txt
@@ -148,47 +272,103 @@ jobs:
           PG_DR_HOST: localhost
           PG_SRC_PORT: '5432'
           PG_DR_PORT: '5433'
-          RTO_BUDGET_SECONDS: ${{ github.event.inputs.rto_budget_seconds || '14400' }}
         run: |
           set -euo pipefail
           AGE_RECIPIENT="$(cat "${AGE_RECIPIENT_FILE}")"
           export AGE_RECIPIENT
           chmod +x ops/backup/*.sh
-          bash ops/backup/test-roundtrip.sh
+          ROUNDTRIP_START=$(date -u +%s)
+          # Capture stdout pour parser l'event JSON final
+          bash ops/backup/test-roundtrip.sh | tee /tmp/roundtrip.out
+          ROUNDTRIP_END=$(date -u +%s)
+          ROUNDTRIP_DURATION=$((ROUNDTRIP_END - ROUNDTRIP_START))
+          echo "roundtrip_duration_seconds=${ROUNDTRIP_DURATION}" >> "$GITHUB_OUTPUT"
+
+      - name: 'assert_rto: roundtrip duration ≤ RTO_BUDGET_SECONDS (4h)'
+        # Le test-roundtrip.sh a déjà cette assertion en interne (exit
+        # 6 si dépassé). On la rejoue ici comme step CI distinct pour :
+        # 1) émettre une erreur explicite GitHub Actions
+        # 2) capturer la métrique dans les logs structurés
+        run: |
+          set -euo pipefail
+          DUR="${{ steps.roundtrip.outputs.roundtrip_duration_seconds }}"
+          BUDGET="${RTO_BUDGET_SECONDS}"
+          if [ "${DUR}" -gt "${BUDGET}" ]; then
+            echo "::error::RTO budget exceeded — ${DUR}s > ${BUDGET}s"
+            exit 1
+          fi
+          echo "[assert_rto] OK — roundtrip ${DUR}s (budget ${BUDGET}s)"
 
       - name: Capture roundtrip event JSON for downstream metrics
         if: always()
         run: |
           set -euo pipefail
-          # On re-extrait le dernier event JSON (déjà loggé pendant
-          # l'étape précédente, mais on le sépare ici pour qu'il soit
-          # facilement parsable par d'autres jobs / artifacts).
-          # Ce step ne fait rien si la stack a déjà été cleanup.
-          if docker exec -i interim-postgres pg_isready -U dev >/dev/null 2>&1; then
-            docker exec -i interim-postgres psql -U dev -d interim_dev -c \
-              "SELECT count(*) AS rows_after_roundtrip FROM temp_workers;" || true
+          # Parse le dernier event JSON produit par test-roundtrip.sh
+          # pour archive/inspection (Loki en prod consomme ça).
+          if [ -f /tmp/roundtrip.out ]; then
+            grep '"event":"dr_roundtrip.completed"' /tmp/roundtrip.out | tail -1 || \
+              echo "::warning::Aucun event dr_roundtrip.completed trouvé"
           fi
 
-      - name: Upload diagnostic logs on failure
+      # ─────────────────────────────────────────────────────────────────
+      # ARTIFACTS ENRICHIS sur échec — pour debug post-mortem rapide.
+      # On capture : compose logs, dumps source/cible, pg_stat_statements,
+      # event JSON, recipient public (pas la clé privée).
+      # ─────────────────────────────────────────────────────────────────
+
+      - name: Collect failure artifacts (compose logs + dumps + pg_stat)
+        if: failure()
+        run: |
+          set +e # tout collecter même si certaines commandes échouent
+          mkdir -p /tmp/dr-failure
+          echo "=== docker compose ps ==="                                > /tmp/dr-failure/compose-ps.txt
+          docker compose -f docker-compose.yml -f ops/docker-compose.dr-test.yml ps \
+            >> /tmp/dr-failure/compose-ps.txt 2>&1
+          echo "=== postgres (source) logs ==="                           > /tmp/dr-failure/postgres-src.log
+          docker logs interim-postgres --tail 500 >> /tmp/dr-failure/postgres-src.log 2>&1
+          echo "=== postgres-dr (cible) logs ==="                         > /tmp/dr-failure/postgres-dr.log
+          docker logs interim-postgres-dr --tail 500 >> /tmp/dr-failure/postgres-dr.log 2>&1
+          # pg_stat_statements si activé (donne le top des requêtes
+          # lentes au moment de l'échec — utile pour pg_dump qui timeout)
+          docker exec -i interim-postgres psql -U dev -d interim_dev -c \
+            "SELECT query, calls, mean_exec_time, max_exec_time
+             FROM pg_stat_statements ORDER BY mean_exec_time DESC LIMIT 20;" \
+            > /tmp/dr-failure/pg-stat-src.txt 2>&1 || \
+            echo "pg_stat_statements non disponible (extension pas activée)" \
+              > /tmp/dr-failure/pg-stat-src.txt
+          # rowcounts source/cible au moment de l'échec
+          docker exec -i interim-postgres psql -U dev -d interim_dev -c \
+            "SELECT 'temp_workers' AS t, count(*) FROM temp_workers
+             UNION ALL SELECT 'mission_proposals', count(*) FROM mission_proposals
+             UNION ALL SELECT 'timesheets', count(*) FROM timesheets
+             UNION ALL SELECT 'audit_logs', count(*) FROM audit_logs;" \
+            > /tmp/dr-failure/rowcounts-src.txt 2>&1 || true
+          docker exec -i interim-postgres-dr psql -U dev -d interim_dr -c \
+            "SELECT 'temp_workers' AS t, count(*) FROM temp_workers
+             UNION ALL SELECT 'mission_proposals', count(*) FROM mission_proposals
+             UNION ALL SELECT 'timesheets', count(*) FROM timesheets
+             UNION ALL SELECT 'audit_logs', count(*) FROM audit_logs;" \
+            > /tmp/dr-failure/rowcounts-dr.txt 2>&1 || true
+          # Le dump produit (max 50 MB pour rester raisonnable côté GH artifacts)
+          if [ -d /tmp/dr-asserts ]; then
+            find /tmp/dr-asserts -type f -size -50M -exec cp {} /tmp/dr-failure/ \;
+          fi
+          # Stdout du roundtrip
+          [ -f /tmp/roundtrip.out ] && cp /tmp/roundtrip.out /tmp/dr-failure/
+          # Recipient public (jamais la clé privée — garde-fou explicite)
+          [ -f ops/backup/test-keys/recipient.txt ] && \
+            cp ops/backup/test-keys/recipient.txt /tmp/dr-failure/age-recipient-public.txt
+          ls -la /tmp/dr-failure/
+
+      - name: Upload failure artifacts
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: dr-roundtrip-failure-${{ github.run_id }}
-          path: |
-            ops/backup/test-keys/recipient.txt
+          path: /tmp/dr-failure/
           retention-days: 7
           # On n'upload PAS la clé privée (`identity.txt`) — même éphémère,
           # garde-fou contre un mauvais usage en cas de fork malveillant.
-
-      - name: Dump container logs on failure
-        if: failure()
-        run: |
-          echo "=== postgres logs ==="
-          docker logs interim-postgres --tail 100 2>&1 || true
-          echo "=== postgres-dr logs ==="
-          docker logs interim-postgres-dr --tail 100 2>&1 || true
-          echo "=== docker compose ps ==="
-          docker compose -f docker-compose.yml -f ops/docker-compose.dr-test.yml ps || true
 
       - name: Cleanup containers + ephemeral keys
         if: always()
@@ -196,4 +376,5 @@ jobs:
           set +e
           docker compose -f docker-compose.yml -f ops/docker-compose.dr-test.yml down -v
           rm -rf ops/backup/test-keys
+          rm -rf /tmp/dr-asserts /tmp/dr-failure /tmp/roundtrip.out
           echo "[cleanup] containers stopped, ephemeral keys removed"

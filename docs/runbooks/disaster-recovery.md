@@ -258,10 +258,117 @@ Ces métriques sont exposées par les jobs eux-mêmes (logs JSON Promtail-parsé
 
 ---
 
-## 7. Références
+## 7. Validation CI automatique (DETTE-037)
+
+Le workflow `.github/workflows/dr-roundtrip.yml` joue automatiquement la procédure DR (sections 3 et 4) en mode jouet :
+
+| Trigger | Quand | Pourquoi |
+|---|---|---|
+| `schedule` cron `0 3 1 * *` | 1er du mois 03h00 UTC | Gameday minimal — détecte les régressions silencieuses (rotation deps Ubuntu, `age` cassé, image Postgres modifiée) |
+| `pull_request` paths-filter | Toute PR qui touche `ops/backup/**`, `ops/docker-compose.dr-test.yml`, `docker-compose.yml` ou le workflow | Bloque dès la PR un changement qui casserait le restore |
+| `workflow_dispatch` | Manuel — gameday ad-hoc, debug | Inputs : `rto_budget_seconds`, `rpo_budget_seconds`, `seed_rows_per_table` |
+
+### 7.1 Enchaînement des steps
+
+1. **`shellcheck`** (job séparé, gate du job principal) : lint des scripts `ops/backup/*.sh` via `ludeeus/action-shellcheck`. Sévérité `warning`. Si fail → tout le workflow s'arrête.
+2. **Install `age` + `postgresql-client-16`** sur le runner Ubuntu 24.04
+3. **Génère paire de clés age éphémère** dans `ops/backup/test-keys/` (jetée à la fin, jamais committée — `.gitignore` couvre)
+4. **`docker compose up`** Postgres source (port 5432) + DR (port 5433) avec override `dr-test.yml`
+5. **Wait healthy** (30 tentatives × 2s = 60s max — sinon dump container logs et exit 1)
+6. **Seed source DB** : `SEED_ROWS=500` rows × 4 tables critiques (`temp_workers`, `mission_proposals`, `timesheets`, `audit_logs`)
+7. **`pg_dump.sh` standalone** : produit un dump dans `/tmp/dr-asserts/` pour les asserts ci-dessous
+8. **`assert_sha256`** : recalcule sha256 du `.dump.age` et compare au `.sha256` produit par `pg_dump.sh`. Détecte une régression où `pg_dump.sh` produirait un sha256 incohérent.
+9. **`assert_age_header`** : vérifie que les 22 premiers octets du dump sont `age-encryption.org/v1`. **Garde-fou P1** contre une régression où `pg_dump.sh` oublierait l'étape de chiffrement (data leak en prod).
+10. **`assert_rpo`** : vérifie `dump_duration ≤ RPO_BUDGET_SECONDS` (default 900s = 15 min). Sur le seed CI minimal, doit être de l'ordre de 1-3s. Si > 15 min → soit pg_dump est cassé, soit le runner est saturé.
+11. **`test-roundtrip.sh`** : enchaîne dump → restore → compare rowcounts source/cible
+12. **`assert_rto`** : vérifie `roundtrip_duration ≤ RTO_BUDGET_SECONDS` (default 14400s = 4h). Sur le seed CI minimal, doit être de l'ordre de 10-30s.
+
+### 7.2 Format des logs en CI
+
+Les scripts `_lib.sh`-aware détectent `env CI=true` et basculent sur **JSON Lines** :
+
+```
+{"ts":"2026-04-23T12:34:56.789Z","level":"info","script":"pg_dump.sh","msg":"pg_dump start","ctx":{"db":"interim_dev","host":"localhost","port":5432}}
+{"ts":"2026-04-23T12:34:57.012Z","level":"info","script":"pg_dump.sh","msg":"pg_dump ok","ctx":{"db":"interim_dev","sizeBytes":12345}}
+```
+
+En local (sans `CI=true`), les logs restent en format `[script] message` human-readable.
+
+Cela permet à Promtail (en prod, hors CI) ou à des jobs CI downstream de parser les logs sans regex fragile.
+
+### 7.3 Exit codes normalisés
+
+Tous les scripts `ops/backup/*.sh` partagent les codes définis dans `_lib.sh` :
+
+| Code | Constante | Sens |
+|---|---|---|
+| 0 | `EXIT_OK` | succès |
+| 1 | `EXIT_DUMP_FAIL` | `pg_dump` a échoué |
+| 2 | `EXIT_AGE_FAIL` | encrypt OU decrypt age a échoué (clé invalide, header invalide) |
+| 3 | `EXIT_SHA256_FAIL` | sha256 mismatch OU download source impossible |
+| 4 | `EXIT_RESTORE_FAIL` | `pg_restore` a échoué OU upload bucket a échoué (overlap acceptable) |
+| 5 | `EXIT_ROWCOUNT_MISMATCH` | rowcounts source ≠ cible (corruption silencieuse) — uniquement émis par `test-roundtrip.sh` |
+| 6 | `EXIT_RTO_EXCEEDED` | `RTO_BUDGET_SECONDS` dépassé — uniquement émis par `test-roundtrip.sh` |
+
+Un on-call qui voit `exit 5` dans les logs Loki sait qu'il s'agit d'une **divergence rowcount** — pas besoin d'aller lire la stdout pour diagnostiquer.
+
+### 7.4 Artifacts en cas d'échec
+
+Si l'un des steps échoue, le step `Collect failure artifacts` collecte automatiquement :
+
+- `compose-ps.txt` — état des containers
+- `postgres-src.log` — 500 dernières lignes Postgres source
+- `postgres-dr.log` — 500 dernières lignes Postgres DR
+- `pg-stat-src.txt` — top 20 requêtes lentes (`pg_stat_statements` si activé)
+- `rowcounts-src.txt`, `rowcounts-dr.txt` — counts par table critique
+- Le dump produit (≤ 50 MB) — pour rejeu local
+- `roundtrip.out` — stdout complet du test
+- `age-recipient-public.txt` — clé publique éphémère (la privée n'est **jamais** uploadée)
+
+Téléchargeables 7 jours dans l'onglet "Artifacts" du run GitHub Actions.
+
+### 7.5 Quoi faire si le job CI échoue
+
+1. **Lire les logs** dans l'onglet Actions + télécharger `dr-roundtrip-failure-<run-id>`
+2. **Identifier l'exit code** dans les logs (ex: `exit 3` = sha256 mismatch)
+3. **Reproduire localement** :
+   ```bash
+   docker compose -f docker-compose.yml -f ops/docker-compose.dr-test.yml up -d postgres postgres-dr
+   age-keygen -o ops/backup/test-keys/identity.txt
+   grep '^# public key:' ops/backup/test-keys/identity.txt | cut -d' ' -f4 > ops/backup/test-keys/recipient.txt
+   AGE_RECIPIENT=$(cat ops/backup/test-keys/recipient.txt) \
+   AGE_IDENTITY_FILE=ops/backup/test-keys/identity.txt \
+   bash ops/backup/test-roundtrip.sh
+   ```
+4. **Causes courantes** :
+   - `assert_age_header` fail → régression dans `pg_dump.sh` qui oublie le step `age --encrypt` (P1, data leak prod)
+   - `assert_sha256` fail → régression dans `pg_dump.sh` qui produit un `.sha256` incohérent (corruption silencieuse possible)
+   - `assert_rpo` > 900s → pg_dump trop lent (image Docker saturée, seed trop gros, perf Postgres dégradée)
+   - `assert_rto` > 14400s → soit le seed est anormalement gros, soit pg_restore est cassé
+   - exit 5 (rowcount mismatch) → corruption pendant le roundtrip — **inspecter `_dr` rapidement**
+5. **Si flake confirmé** : ouvrir un ticket DETTE pour stabiliser (ex: timeout réseau Docker Hub)
+
+### 7.6 Test régression intentionnel (gameday checklist)
+
+Périodiquement (1× par trimestre minimum), valider que le workflow détecte bien les régressions critiques :
+
+| Test | Modification | Résultat attendu |
+|---|---|---|
+| Sha256 désynchronisé | Modifier `pg_dump.sh` pour écrire un sha256 random au lieu du vrai | `assert_sha256` doit fail → workflow rouge |
+| Plain text au lieu d'age | Modifier `pg_dump.sh` pour skipper `age --encrypt` (cp direct) | `assert_age_header` doit fail → workflow rouge |
+| RPO budget violé | `workflow_dispatch` avec `rpo_budget_seconds=1` | `assert_rpo` doit fail → workflow rouge |
+| Rowcount mismatch | Modifier `pg_restore.sh` pour skipper une table | exit 5 → `test-roundtrip.sh` fail → workflow rouge |
+
+**Toujours** revert ces modifs avant de merger. Cf. PR #82 pour le run de référence du test régression sha256.
+
+---
+
+## 8. Références
 
 - `skills/dev/devops-swiss/SKILL.md` § Backup Postgres
 - `skills/ops/release-management/SKILL.md` § Gestion d'incident
 - `ops/backup/README.md` — détails opérationnels scripts
+- `ops/backup/_lib.sh` — helpers communs (log_msg, exit codes)
+- `.github/workflows/dr-roundtrip.yml` — workflow CI complet
 - Postgres docs : https://www.postgresql.org/docs/16/continuous-archiving.html
 - age encryption : https://age-encryption.org
