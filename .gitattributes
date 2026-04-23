@@ -1,0 +1,26 @@
+# Conventions de fin de ligne et permissions Git pour Helvètia Intérim.
+#
+# Force LF sur tous les scripts shell, YAML, JSON pour rester portable
+# entre Windows (CRLF natif) et Linux (LF).
+
+# Scripts shell : toujours LF + exécutable
+*.sh             text eol=lf
+*.bash           text eol=lf
+
+# Configs déclaratives : toujours LF
+*.yml            text eol=lf
+*.yaml           text eol=lf
+*.json           text eol=lf
+
+# Code TS/JS : toujours LF (cohérent avec config Prettier)
+*.ts             text eol=lf
+*.tsx            text eol=lf
+*.js             text eol=lf
+*.jsx            text eol=lf
+*.mjs            text eol=lf
+
+# Markdown : toujours LF
+*.md             text eol=lf
+
+# Lockfile pnpm : LF strict (sinon pnpm install regenère et casse cache)
+pnpm-lock.yaml   text eol=lf
