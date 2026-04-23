@@ -1,36 +1,113 @@
 # PROGRESS.md — État d'avancement du projet
 
-> **Dernière mise à jour** : 2026-04-22 07:35 — Dettes 003/004/005/009/011/012 fermées (chaîne automatique). API Dockerfile + Testcontainers + husky typecheck. 200 unit + 6 integration tests. 5 dettes restantes (toutes externes ou ETA A.6).
+> **Dernière mise à jour** : 2026-04-23 — **Resynchronisation complète** après dérive depuis 2026-04-22 07:35. Croisement systématique commits/PRs/code. **42/48 prompts catalogue + 2 PRs ad-hoc** complétés. **1081 tests verts** sur 8 workspaces. Reste : actions humaines externes (provisioning GCP, Firebase, Swissdec, pentest, go-live) + 2 sprints partiels à finaliser (A6.3 ops infra, A6.5 backup test).
 > **Source de vérité** pour l'orchestrateur. **Ne jamais** le mettre à jour à la main sans avoir suivi le protocole `ORCHESTRATOR.md`.
 
 ---
 
 ## 0. Instantané
 
-- **Sprint courant** : A.1 (1/7 prompts complétés)
-- **Phase** : première entité métier complète, architecture hexagonale validée de bout en bout
-- **Prochain prompt** : `A1.2-worker-documents-upload`
-- **Prompts complétés** : 5 / 53
-- **Prompts détaillés prêts à exécuter** : 48 sprint + 5 OPS = **53/53** 🎉
+- **Sprint courant** : A.6 (4/7 prompts complétés, dont 1 partiel)
+- **Phase** : MVP fonctionnel bout-en-bout (worker → mission → contrat → timesheet → paie → facture → conformité). Reste l'infra ops + le go-live.
+- **Prochain prompt** : `A6.3-observability-stack` (clore la partie code-config — Grafana dashboards, Loki pipeline, Alertmanager rules)
+- **Prompts complétés** : 42 / 48 catalogue (87.5%) + 2 ad-hoc (design + dev fix) + 0 / 5 OPS
 - **Blockers ouverts** : 2 (BLOCKER-001 sandbox MP, BLOCKER-002 autorisation LSE — externes, non-dev)
-- **Dette technique** : 5 ouvertes / 14 fermées (003/004/005/009/010/011/012/017/018/019/020/021/022/023). DETTE-001 reportée A.6.
-- **Vélocité observée** : — (premier prompt tout juste fini)
+- **Dette technique** : 5 ouvertes / 23 fermées (006/008/014/015/016 ouvertes, toutes externes ou A.6 ops)
+- **Tests** : **1081 unit + 6 integration** sur 8 workspaces (vs 206 au dernier point ; +875 tests)
+- **Vélocité observée** : ~40 prompts en 36 heures (sprint marathon 2026-04-21 → 2026-04-23)
 - **Skills disponibles** : 32 (voir `skills/README.md`)
-- **Documents de référence** : 10 (brief, spec, plan, archi, risques, rôles, registre nLPD, pr-template, ADR-0001, skills README)
+- **Documents de référence** : 13 (brief, spec, plan, archi, risques, rôles, registre nLPD, pr-template, ADR-0001/0002/0003, dev-setup, firebase-setup, github-branch-protection, runbooks ×6)
 
 ---
 
 ## 1. Prompts par statut
 
-### ✅ Completed
+### ✅ Completed (42 catalogue + 2 ad-hoc)
 
-| Prompt | Sprint | Complété le | Branche / PR | Commit | Notes |
-|--------|--------|-------------|--------------|--------|-------|
-| `A0.1-init-monorepo` | A.0 | 2026-04-21 | [PR #1](https://github.com/kreuille/interim-agency-system/pull/1) ✅ merged | `0b9cd1e` | Monorepo pnpm + 4 packages + 4 apps + 15 tests verts |
-| `A0.2-docker-compose-local` | A.0 | 2026-04-21 | [PR #2](https://github.com/kreuille/interim-agency-system/pull/2) ✅ merged | `3c36bd5` | docker-compose + Makefile + mock MP + smoke test ; stack up en 13 s |
-| `A0.3-ci-github-actions` | A.0 | 2026-04-21 | [PR #3](https://github.com/kreuille/interim-agency-system/pull/3) ✅ merged | `7e335e3` | 3 workflows (ci, trivy, release) + dependabot + CODEOWNERS + PR template ; CI verte sur PR #3 elle-même |
-| `A0.5-prisma-schema-v0` | A.0 | 2026-04-21 | [PR #17](https://github.com/kreuille/interim-agency-system/pull/17) ✅ merged | `7c0ac23` | 18 modèles + 13 enums + migration initiale appliquée + seed idempotent + tenant middleware testé |
-| `A1.1-worker-entity-crud` | A.1 | 2026-04-21 | `feat/A1.1-worker-entity-crud` | (à pousser) | VOs (Avs/Iban/Canton/Name/Email/Phone) + entité TempWorker + 5 use cases + Prisma repo + REST + OpenAPI + audit log ; 101 tests verts |
+#### Sprint A.0 — Setup (5/6)
+
+| Prompt | Complété le | PR | Commit | Notes |
+|--------|-------------|----|----|-------|
+| `A0.1-init-monorepo` | 2026-04-21 | [#1](https://github.com/kreuille/interim-agency-system/pull/1) | `0b9cd1e` | Monorepo pnpm + 4 packages + 4 apps + 15 tests |
+| `A0.2-docker-compose-local` | 2026-04-21 | [#2](https://github.com/kreuille/interim-agency-system/pull/2) | `f87fef9` | docker-compose + Makefile + mock MP + smoke test |
+| `A0.3-ci-github-actions` | 2026-04-21 | [#3](https://github.com/kreuille/interim-agency-system/pull/3) | `9013ffc` | 3 workflows + dependabot + CODEOWNERS + PR template |
+| `A0.5-prisma-schema-v0` | 2026-04-21 | [#17](https://github.com/kreuille/interim-agency-system/pull/17) | `5f48f04` | 18 modèles + 13 enums + seed idempotent + tenant middleware |
+| `A0.6-auth-firebase-setup` (code) | 2026-04-21 | [#18](https://github.com/kreuille/interim-agency-system/pull/18) | `6bc714d` | RBAC 7×12 + TokenVerifier + authMiddleware + ADR-0003. **Reste** DETTE-014 (provisioning Firebase, action humaine) |
+
+#### Sprint A.1 — Core (7/7) ✅ COMPLET
+
+| Prompt | Complété le | PR | Commit | Notes |
+|--------|-------------|----|----|-------|
+| `A1.1-worker-entity-crud` | 2026-04-21 | [#20](https://github.com/kreuille/interim-agency-system/pull/20) | `c4ce0bf` | VOs + entité + 5 use cases + Prisma repo + REST + audit log |
+| `A1.2-worker-documents-upload` | 2026-04-22 | [#23](https://github.com/kreuille/interim-agency-system/pull/23) | `3c6f06d` | Multipart + scan antivirus + signed URLs |
+| `A1.3-document-expiry-alerts` | 2026-04-22 | [#27](https://github.com/kreuille/interim-agency-system/pull/27) | `1bc03a4` | Cron scan + 4 channels + idempotent |
+| `A1.4-client-entity-crud` | 2026-04-22 | [#28](https://github.com/kreuille/interim-agency-system/pull/28) | `c2add42` | IDE VO + status machine + REST |
+| `A1.5-client-contract-rate-card` | 2026-04-22 | [#29](https://github.com/kreuille/interim-agency-system/pull/29) | `5be67e6` | Taux CCT minimum + rate card |
+| `A1.6-audit-log-infra` | 2026-04-22 | [#30](https://github.com/kreuille/interim-agency-system/pull/30) | `4646dee` | Hash chain append-only |
+| `A1.7-admin-ui-core` | 2026-04-22 | [#31](https://github.com/kreuille/interim-agency-system/pull/31) | `62cc3f3` | Next.js 14 + RHF/Zod + dev auth scaffolding |
+
+#### Sprint A.2 — Availability (6/6) ✅ COMPLET
+
+| Prompt | Complété le | PR | Commit | Notes |
+|--------|-------------|----|----|-------|
+| `A2.1-availability-entity` | 2026-04-22 | [#33](https://github.com/kreuille/interim-agency-system/pull/33) | `c34ad76` | Aggregate + RRULE expansion |
+| `A2.2-availability-ui-calendar` | 2026-04-22 | [#34](https://github.com/kreuille/interim-agency-system/pull/34) | `0e4dde6` | Calendrier hebdo + use cases + API |
+| `A2.3-availability-self-portal` | 2026-04-22 | [#35](https://github.com/kreuille/interim-agency-system/pull/35) | `f58ab32` | PWA portail intérimaire (web-portal) |
+| `A2.4-moveplanner-api-client` | 2026-04-22 | [#36](https://github.com/kreuille/interim-agency-system/pull/36) | `9483080` | Client HTTP typé + 4 adapters + idempotency |
+| `A2.5-availability-push-queue` | 2026-04-22 | [#37](https://github.com/kreuille/interim-agency-system/pull/37) | `d1f11fa` | Outbox pattern + BullMQ availability-sync drain |
+| `A2.6-circuit-breaker-alerting` | 2026-04-22 | [#38](https://github.com/kreuille/interim-agency-system/pull/38) | `b536195` | Circuit breaker + Sentry hook + runbook MP unreachable |
+
+#### Sprint A.3 — Webhooks & propositions (6/6) ✅ COMPLET
+
+| Prompt | Complété le | PR | Commit | Notes |
+|--------|-------------|----|----|-------|
+| `A3.1-webhook-endpoint-hmac` | 2026-04-22 | [#40](https://github.com/kreuille/interim-agency-system/pull/40) | `3c4ee55` | HMAC-SHA256 + tolérance ±5 min |
+| `A3.2-inbound-webhook-persistence` | 2026-04-22 | [#41](https://github.com/kreuille/interim-agency-system/pull/41) | `b7c8533` | Idempotency Event-Id + dispatcher BullMQ |
+| `A3.3-mission-proposal-entity` | 2026-04-22 | [#42](https://github.com/kreuille/interim-agency-system/pull/42) | `4d23959` | Aggregate FSM + handler `worker.assignment.proposed` |
+| `A3.4-proposal-routing-modes` | 2026-04-22 | [#43](https://github.com/kreuille/interim-agency-system/pull/43) | `5a6beea` | Pass-through vs agency-controlled + accept/refuse on behalf + 4 webhook handlers |
+| `A3.5-sms-swisscom-adapter` | 2026-04-22 | [#44](https://github.com/kreuille/interim-agency-system/pull/44) | `9c9e23e` | Port + use cases envoi/opt-out + rate limit + templates i18n |
+| `A3.6-proposal-dashboard-ui` | 2026-04-22 | [#45](https://github.com/kreuille/interim-agency-system/pull/45) | `eb14e40` | Dashboard Kanban + 5 endpoints REST + RBAC |
+
+#### Sprint A.4 — Contrats & timesheets (7/7) ✅ COMPLET
+
+| Prompt | Complété le | PR | Commit | Notes |
+|--------|-------------|----|----|-------|
+| `A4.1-mission-contract-entity` | 2026-04-22 | [#47](https://github.com/kreuille/interim-agency-system/pull/47) | `06b48f0` | Aggregate FSM + GenerateMissionContractUseCase |
+| `A4.2-contract-pdf-generator` | 2026-04-22 | [#51](https://github.com/kreuille/interim-agency-system/pull/51) | `ea700f1` | pdf-lib + templates FR par branche CCT |
+| `A4.3-signature-zertes-integration` | 2026-04-22 | [#52](https://github.com/kreuille/interim-agency-system/pull/52) | `8b15806` | ZertES e-signature port + use cases + Swisscom webhook |
+| `A4.4-ged-archival-10-years` | 2026-04-22 | [#53](https://github.com/kreuille/interim-agency-system/pull/53) | `15c0396` | WORM 10 ans avec rétention par catégorie |
+| `A4.5-timesheet-inbound` | 2026-04-22 | [#54](https://github.com/kreuille/interim-agency-system/pull/54) | `8faf0a1` | Inbound webhook + anomalies LTr/CCT + Timesheet aggregate |
+| `A4.6-timesheet-review-ui` | 2026-04-22 | [#56](https://github.com/kreuille/interim-agency-system/pull/56) | `6acb11d` | UI contrôle + bulk sign |
+| `A4.7-timesheet-sign-dispute-api` | 2026-04-22 | [#55](https://github.com/kreuille/interim-agency-system/pull/55) | `c628d0f` | Sign + dispute use cases + push MP + confirmation handler |
+
+#### Sprint A.5 — Paie & facturation (8/9, A5.5 externe)
+
+| Prompt | Complété le | PR | Commit | Notes |
+|--------|-------------|----|----|-------|
+| `A5.1-payroll-engine-cct` | 2026-04-22 | [#58](https://github.com/kreuille/interim-agency-system/pull/58) | `a7cbe22` | Moteur de paie hebdo pur domain — CCT × heures × majo |
+| `A5.2-payroll-majorations` | 2026-04-22 | (inclus dans #58) | `a7cbe22` | `surcharge-rules.ts` + `canton-holidays.ts` (jours fériés VD/GE/FR/VS/BE/NE/JU/TI/ZH) bundlés avec A5.1 |
+| `A5.3-payroll-retenues-sociales` | 2026-04-22 | [#59](https://github.com/kreuille/interim-agency-system/pull/59) | `c158443` | AVS/AC/LAA/LPP + IS cantonal + arrondi 5cts NET |
+| `A5.4-payslip-pdf-standard-ch` | 2026-04-22 | [#60](https://github.com/kreuille/interim-agency-system/pull/60) | `257258e` | Bulletin de paie PDF déterministe |
+| `A5.6-iso20022-pain001-export` | 2026-04-22 | [#61](https://github.com/kreuille/interim-agency-system/pull/61) | `ad239e4` | Export ISO 20022 pain.001.001.09 CH |
+| `A5.7-invoice-qrbill-generator` | 2026-04-22 | [#62](https://github.com/kreuille/interim-agency-system/pull/62) | `1b4cfb7` | Facture client + QR-bill SIX + TVA 8.1% |
+| `A5.8-invoice-relances-pipeline` | 2026-04-22 | [#63](https://github.com/kreuille/interim-agency-system/pull/63) | `6329bff` | Relances J+7/15/30/45 + escalade rôles |
+| `A5.9-accounting-export-bexio-abacus` | 2026-04-22 | [#64](https://github.com/kreuille/interim-agency-system/pull/64) | `644c213` | Entries double-partie + plan comptable PME + CSV export |
+
+#### Sprint A.6 — Conformité & go-live (3/7 + 1 partiel)
+
+| Prompt | Complété le | PR | Commit | Notes |
+|--------|-------------|----|----|-------|
+| `A6.1-compliance-dashboard` | 2026-04-22 | [#65](https://github.com/kreuille/interim-agency-system/pull/65) | `f56cd54` | 5 indicateurs LSE/CCT/docs/missions/nLPD |
+| `A6.2-seco-export-one-click` | 2026-04-22 | [#66](https://github.com/kreuille/interim-agency-system/pull/66) | `5eedfee` | Bundle CSV + résumé contrôle SECO |
+| `A6.3-observability-stack` *(partiel — code only)* | 2026-04-22 | [#48](https://github.com/kreuille/interim-agency-system/pull/48) | `412d903` | Sentry + OTel + Prometheus posés (DETTE-026/027). **Reste** : configs Grafana dashboards JSON, pipeline Loki, règles Alertmanager → à clore dans `ops/grafana/` + `ops/loki/` + `ops/alertmanager/` |
+| `A6.4-runbooks-incidents` | 2026-04-22 | [#67](https://github.com/kreuille/interim-agency-system/pull/67) | `78a494a` | 5 runbooks incidents prod copy-paste-ready |
+
+#### PRs ad-hoc (hors catalogue)
+
+| Prompt | Complété le | PR | Commit | Notes |
+|--------|-------------|----|----|-------|
+| `AH.001-helvetia-design-system` | 2026-04-23 | [#68](https://github.com/kreuille/interim-agency-system/pull/68) | `b1851b1` | Habillage swiss-precise (Inter + JetBrains Mono + accent CH red) — sidebar 236px + topbar 52px + dashboard + workers + clients + login |
+| `AH.002-fix-web-admin-dev-server` | 2026-04-23 | [#69](https://github.com/kreuille/interim-agency-system/pull/69) | `414002e` | next.config.mjs : extensionAlias `.js→.ts` + NormalModuleReplacementPlugin pour `node:*` côté client + fallback crypto/fs |
 
 ### 🟡 In progress
 
@@ -40,54 +117,32 @@
 
 *(aucun)*
 
-### 🔵 Pending (ordre de priorité)
+### 🔵 Pending — actions externes / humaines
 
-| Ordre | Prompt | Sprint | Effort | BlockedBy | Notes |
-|-------|--------|--------|--------|-----------|-------|
-| 1 | `A1.2-worker-documents-upload` | A.1 | L | A1.1 ✅ | **Prêt à lancer** — wire storage CMEK attend DETTE-015 |
-| 2 | `A0.4-hosting-ch-provisioning` | A.0 | L | DETTE-015 | Action humaine fondateur (provisioning GCP selon ADR-0002) |
-| 3 | `A0.6-auth-firebase-setup` (côté tenant) | A.0 | S | DETTE-014 | Action humaine fondateur (création projets Firebase selon `docs/firebase-setup.md`) |
-| 8 | `A1.2-worker-documents-upload` | A.1 | L | A1.1 | Chiffrement CMEK |
-| 9 | `A1.3-document-expiry-alerts` | A.1 | M | A1.2 | |
-| 10 | `A1.4-client-entity-crud` | A.1 | M | A0.5 | |
-| 11 | `A1.5-client-contract-rate-card` | A.1 | M | A1.4 | Taux CCT obligatoires |
-| 12 | `A1.6-audit-log-infra` | A.1 | M | A0.5 | |
-| 13 | `A1.7-admin-ui-core` | A.1 | L | A1.1,A1.4 | Next.js app-router |
-| 14 | `A2.1-availability-entity` | A.2 | M | A1.1 | |
-| 15 | `A2.2-availability-ui-calendar` | A.2 | L | A2.1,A1.7 | |
-| 16 | `A2.3-availability-self-portal` | A.2 | L | A2.1 | PWA mobile intérimaire |
-| 17 | `A2.4-moveplanner-api-client` | A.2 | L | A0.6 | mTLS + API key rotation |
-| 18 | `A2.5-availability-push-queue` | A.2 | M | A2.1,A2.4 | BullMQ + idempotency |
-| 19 | `A2.6-circuit-breaker-alerting` | A.2 | S | A2.4 | Opossum + Sentry |
-| 20 | `A3.1-webhook-endpoint-hmac` | A.3 | M | A0.6 | Vérif signature + tolérance horloge |
-| 21 | `A3.2-inbound-webhook-persistence` | A.3 | M | A3.1 | Idempotency par Event-Id |
-| 22 | `A3.3-mission-proposal-entity` | A.3 | M | A1.1 | |
-| 23 | `A3.4-proposal-routing-modes` | A.3 | L | A3.3 | Pass-through vs contrôle |
-| 24 | `A3.5-sms-swisscom-adapter` | A.3 | M | — | Parallèle A3.1 |
-| 25 | `A3.6-proposal-dashboard-ui` | A.3 | L | A3.3,A1.7 | |
-| 26 | `A4.1-mission-contract-entity` | A.4 | M | A3.3 | |
-| 27 | `A4.2-contract-pdf-generator` | A.4 | L | A4.1 | Templates par branche CCT |
-| 28 | `A4.3-signature-zertes-integration` | A.4 | L | A4.2 | Swisscom Trust Signing |
-| 29 | `A4.4-ged-archival-10-years` | A.4 | M | A4.3 | |
-| 30 | `A4.5-timesheet-inbound` | A.4 | M | A3.2 | Webhook `timesheet.ready_for_signature` |
-| 31 | `A4.6-timesheet-review-ui` | A.4 | L | A4.5 | |
-| 32 | `A4.7-timesheet-sign-dispute-api` | A.4 | M | A4.5,A2.4 | |
-| 33 | `A5.1-payroll-engine-cct` | A.5 | XL | A4.7 | Cœur légal, tests massifs |
-| 34 | `A5.2-payroll-majorations` | A.5 | M | A5.1 | Nuit/dim/supp |
-| 35 | `A5.3-payroll-retenues-sociales` | A.5 | L | A5.1 | AVS/AC/LAA/LPP/IS |
-| 36 | `A5.4-payslip-pdf-standard-ch` | A.5 | M | A5.1 | |
-| 37 | `A5.5-elm-swissdec-adapter` | A.5 | L | A5.3 | |
-| 38 | `A5.6-iso20022-pain001-export` | A.5 | M | A5.3 | PostFinance/UBS |
-| 39 | `A5.7-invoice-qrbill-generator` | A.5 | L | A4.7 | Swiss Payment Standards |
-| 40 | `A5.8-invoice-relances-pipeline` | A.5 | M | A5.7 | |
-| 41 | `A5.9-accounting-export-bexio-abacus` | A.5 | L | A5.7 | |
-| 42 | `A6.1-compliance-dashboard` | A.6 | M | A5.* | |
-| 43 | `A6.2-seco-export-one-click` | A.6 | M | A6.1 | |
-| 44 | `A6.3-observability-stack` | A.6 | L | — | Parallèle |
-| 45 | `A6.4-runbooks-incidents` | A.6 | M | A6.3 | |
-| 46 | `A6.5-backup-restore-dr-test` | A.6 | M | A0.4 | |
-| 47 | `A6.6-pentest-externe` | A.6 | L | A6.*  | Prestataire CH |
-| 48 | `A6.7-go-live-pilote` | A.6 | M | all A.* | Jour J |
+| Prompt | Sprint | Effort | Bloqué par | Notes |
+|--------|--------|--------|------------|-------|
+| `A0.4-hosting-ch-provisioning` | A.0 | L | Action humaine fondateur | Provisioning GCP `europe-west6` selon ADR-0002 (Cloud SQL + Memorystore + Cloud Storage CMEK + Secret Manager + OIDC WIF + DPA Google Cloud Switzerland GmbH) |
+| `A5.5-elm-swissdec-adapter` | A.5 | L | Sandbox Swissdec externe | SOAP + signatures électroniques + tests sandbox AVS/SUVA/IS. Code domain peut être prêt mais validation impossible sans accès |
+| `A6.5-backup-restore-dr-test` | A.6 | M | A0.4 (GCP) | Scripts pg_dump + restore + RTO/RPO test plan. **Préparable en local** sans GCP (docker-compose Postgres) |
+| `A6.6-pentest-externe` | A.6 | L | Prestataire CH + budget | Action humaine. Stagnation tant que pilote pas livré |
+| `A6.7-go-live-pilote` | A.6 | M | A0.4, A0.6 (Firebase), A6.5, BLOCKER-002 (autorisation LSE), client pilote signé | Jour J — checklist déploiement Cloud Run + cutover DNS + monitoring |
+
+### 🔵 Pending — code prioritaire (clôture A.6)
+
+| Ordre | Prompt | Sprint | Effort | Notes |
+|-------|--------|--------|--------|-------|
+| 1 | **`A6.3-observability-stack` (clôture ops infra)** | A.6 | M | **Prochain prompt prêt à lancer** — code Sentry/OTel/Prometheus déjà posé (PR #48). Reste : `ops/grafana/dashboards/*.json` (4 dashboards : API health, MP health, payroll batch, queue depth), `ops/loki/promtail-config.yaml`, `ops/alertmanager/rules.yaml` (P1/P2/P3) — purement YAML/JSON dans le repo, validable via docker-compose |
+| 2 | `A6.5-backup-restore-dr-test` (préparation locale) | A.6 | M | Scripts `ops/backup/pg_dump.sh` + `ops/backup/restore.sh` + runbook DR + test E2E avec docker-compose Postgres. Activation prod attend A0.4 |
+
+### 🔵 Pending — OPS transversal (5 prompts catalogués)
+
+| Prompt | Cadence | Notes |
+|--------|---------|-------|
+| `OPS.weekly-review` | Hebdomadaire (vendredi) | Compile métrique vélocité + dette + escalade blockers > 7j |
+| `OPS.permit-expiry-scan` | Quotidien (cron) | Scan expirations permis L/B 60j → notif intérimaire + admin |
+| `OPS.cct-yearly-update` | Annuel (janvier) | Import barèmes CCT swissstaffing → table `cct_minimum_rates` |
+| `OPS.dpia-refresh` | Annuel | Revue DPIA portail intérimaire + registre nLPD |
+| `OPS.api-key-rotation` | Trimestriel | Rotation clés API MovePlanner + Swisscom + Firebase service account |
 
 ### 🚫 Abandonned / Superseded
 
@@ -99,13 +154,17 @@
 
 | Sprint | Début planifié | Fin planifiée | Prompts totaux | Complétés | Statut |
 |--------|----------------|---------------|----------------|-----------|--------|
-| A.0 | S1 | S1 | 6 | 4 | 🟡 En pause (A0.4 + A0.6 bloqués externe) |
-| A.1 | S2 | S3 | 7 | 0 | 🔵 |
-| A.2 | S4 | S5 | 6 | 0 | 🔵 |
-| A.3 | S6 | S7 | 6 | 0 | 🔵 |
-| A.4 | S8 | S9 | 7 | 0 | 🔵 |
-| A.5 | S10 | S12 | 9 | 0 | 🔵 |
-| A.6 | S13 | S14 | 7 | 0 | 🔵 |
+| A.0 | S1 | S1 | 6 | 5 | 🟡 A0.4 externe (provisioning GCP) |
+| A.1 | S2 | S3 | 7 | 7 | ✅ |
+| A.2 | S4 | S5 | 6 | 6 | ✅ |
+| A.3 | S6 | S7 | 6 | 6 | ✅ |
+| A.4 | S8 | S9 | 7 | 7 | ✅ |
+| A.5 | S10 | S12 | 9 | 8 | 🟡 A5.5 externe (sandbox Swissdec) |
+| A.6 | S13 | S14 | 7 | 3.5 | 🟡 A6.3 partiel + A6.5/A6.6/A6.7 externes |
+| Ad-hoc | — | — | 2 | 2 | ✅ Design Helvètia + fix dev server |
+| OPS | continu | continu | 5 | 0 | 🔵 |
+
+**Total catalogue : 42 / 48 (87.5%)**
 
 ---
 
@@ -113,26 +172,42 @@
 
 Décisions prises et non renégociables sans ADR. Mettre à jour au fil de l'eau.
 
-| Date | Décision | ADR | Prise par |
-|------|----------|-----|-----------|
+| Date | Décision | ADR / Source | Prise par |
+|------|----------|--------------|-----------|
 | 2026-04-21 | Stack Node.js 20 + TS strict + PostgreSQL 16 + Next.js 14 | `docs/adr/0001-stack-choice.md` | Brief |
-| 2026-04-21 | Hébergement Suisse obligatoire (Infomaniak ou Exoscale) | ADR-0002 (à créer A0.4) | Brief |
+| 2026-04-21 | Hébergement GCP `europe-west6` (Zurich) — Cloud Run + Cloud SQL + CMEK | `docs/adr/0002-hosting-choice.md` | Fondateur |
+| 2026-04-21 | Auth Firebase Identity Platform multi-tenancy native | `docs/adr/0003-auth-choice.md` | Fondateur |
 | 2026-04-21 | Architecture hexagonale | `CLAUDE.md §2.2` | Lead tech |
 | 2026-04-21 | Montants en Rappen (bigint), `Currency = 'CHF' \| 'EUR'` | `CLAUDE.md §3.1` + Money.ts | Brief + spec MP |
 | 2026-04-21 | Orchestrateur de prompts Markdown (ce document) | ADR-0003 (à créer) | PO + fondateur |
 | 2026-04-21 | Packages exportent `.ts` direct (pas de compile intermédiaire) | A0.1 SESSION-LOG | A0.1 |
-| 2026-04-21 | Pas de `composite: true` ni project refs à ce stade | A0.1 SESSION-LOG | A0.1 |
 | 2026-04-21 | `docs/`, `prompts/`, `skills/`, CLAUDE.md, README.md exclus de Prettier | `.prettierignore` | A0.1 |
 | 2026-04-21 | Augmentation Express via `namespace Express` globale pour `req.user` | `tenant.middleware.ts` | A0.5 |
 | 2026-04-21 | `pnpm.onlyBuiltDependencies` : esbuild, @prisma/client, @prisma/engines, prisma | `package.json` | A0.5 |
 | 2026-04-21 | 18 modèles Prisma + 13 enums, FK `onDelete: Restrict` pour données légales | `apps/api/prisma/schema.prisma` | A0.5 |
-| 2026-04-21 | Hébergement GCP `europe-west6` (Zurich) — Cloud Run + Cloud SQL + CMEK | `docs/adr/0002-hosting-choice.md` | Fondateur |
-| 2026-04-21 | Auth Firebase Identity Platform multi-tenancy native | `docs/adr/0003-auth-choice.md` | Fondateur |
 | 2026-04-21 | RBAC 7 rôles × 12 actions typés ; MFA obligatoire pour `agency_admin` + `payroll_officer` | `packages/domain/src/auth/role.ts` | A0.6 |
-| 2026-04-21 | Repo **public** — GitHub Rulesets `main-protection` + secret scanning + Dependabot alerts activés | ruleset id 15364662 | Fondateur |
+| 2026-04-21 | Repo **public** — GitHub Rulesets `main-protection` + secret scanning + Dependabot | ruleset id 15364662 | Fondateur |
 | 2026-04-21 | Idempotency-Key inbound : UUID v4 + cache DB 24h, hash `sha256(method\|path\|body)` | `idempotency.middleware.ts` | DETTE-017 |
-| 2026-04-21 | Tenant-guard Prisma : defense-in-depth contre fuites cross-tenant via `$extends` | `tenant-guard.ts` | DETTE-019 |
+| 2026-04-21 | Tenant-guard Prisma : defense-in-depth via `$extends` (pas d'injection auto) | `tenant-guard.ts` | DETTE-019 |
 | 2026-04-21 | Coverage enforcement CI : seuils par workspace (domain 85%, shared 80%, app/api 70-80%) | `**/vitest.config.ts` + `.github/workflows/ci.yml` | DETTE-018 |
+| 2026-04-22 | Webhook persistence-first puis dispatch via EventBus (pas de traitement synchrone) | `apps/api/src/infrastructure/webhooks/` | A3.2 |
+| 2026-04-22 | MissionProposal FSM 7 états (`proposed → pass_through_sent / agency_review → accepted/refused/timeout/expired`) | `packages/domain/src/missions/mission-proposal.ts` | A3.3 |
+| 2026-04-22 | Routing mode par agence : pass-through (SMS direct MP→intérimaire) vs agency_controlled (gestion validée par agence) | `assign-routing-mode.use-case.ts` | A3.4 |
+| 2026-04-22 | SMS templates i18n FR/IT/DE par worker locale | `template-renderer.ts` | A3.5 |
+| 2026-04-22 | Contrats CCT : 1 template par branche (déménagement, location services, BTP) en pdf-lib | `packages/domain/src/contracts/templates-fr.ts` | A4.2 |
+| 2026-04-22 | Signature ZertES via Swisscom Trust Signing Services (port abstrait, fallback DocuSign banni) | `packages/application/src/signature/esignature-provider.ts` | A4.3 |
+| 2026-04-22 | GED rétention par catégorie : contrats 10 ans (CO art. 958f), permis 5 ans, payslips 5 ans | `packages/domain/src/ged/legal-archive-entry.ts` | A4.4 |
+| 2026-04-22 | Anomalies LTr/CCT typées (16 codes) + bloquantes vs warning | `packages/domain/src/timesheets/anomaly.ts` | A4.5 |
+| 2026-04-22 | Paie : Money pur côté domain, arrondis 5cts CHF sur NET seulement, basis points pour TVA et taux sociaux | `packages/domain/src/payroll/round-swiss.ts` | A5.1 |
+| 2026-04-22 | LPP barème par tranche d'âge (25-34, 35-44, 45-54, 55-65), exemption < seuil annuel | `packages/domain/src/payroll/lpp-calc.ts` | A5.3 |
+| 2026-04-22 | IS cantonal : barème B/L par canton (VD/GE/FR/VS/BE/NE/JU/TI/ZH), pas de bypass legal | `packages/domain/src/payroll/is-brackets.ts` | A5.3 |
+| 2026-04-22 | QR-bill SIX format ISO 20022 + IID 30000 + référence structurée mod 10 | `packages/domain/src/invoicing/` | A5.7 |
+| 2026-04-22 | Comptabilité PME : entries double-partie + plan comptable suisse (1xxx actifs / 2xxx passifs / 3xxx revenus / 4xxx-7xxx charges) | `packages/domain/src/accounting/chart-of-accounts.ts` | A5.9 |
+| 2026-04-22 | Compliance dashboard : 5 indicateurs (LSE / CCT / docs workers / missions actives / nLPD) avec status `ok|warning|critical` | `packages/domain/src/compliance/indicator-builders.ts` | A6.1 |
+| 2026-04-22 | Export SECO : CSV bundle (workers + missions + contracts + timesheets) + résumé txt + audit log immutable | `packages/domain/src/compliance/seco-export.ts` | A6.2 |
+| 2026-04-22 | Observability code stack : Sentry (EU region) + OTel auto-instrumentation HTTP/Express + Prometheus RED metrics | `apps/api/src/infrastructure/observability/` | A6.3 (partiel) |
+| 2026-04-23 | Design system Helvètia Intérim : Inter + JetBrains Mono + accent rouge CH `#c8102e`, sidebar 236px + topbar 52px | `apps/web-admin/app/globals.css` | AH.001 |
+| 2026-04-23 | Next.js webpack config : `extensionAlias '.js→.ts'` + `NormalModuleReplacementPlugin /^node:/` côté client (workaround monorepo NodeNext + transitive node:crypto) | `apps/web-admin/next.config.mjs` | AH.002 |
 
 ---
 
@@ -141,63 +216,48 @@ Décisions prises et non renégociables sans ADR. Mettre à jour au fil de l'eau
 ### 🔴 BLOCKER-001 — Accès sandbox MovePlanner
 
 - **Ouvert le** : 2026-04-21
-- **Bloque** : A.2 dans sa globalité (push API)
-- **Action** : envoyer demande officielle à l'équipe MovePlanner avec certificat mTLS de test, endpoint webhook temporaire tunneling (ngrok / loophole)
+- **Bloque** : ne bloque plus le dev (mock MP en place, contrats validés via tests Pact-like). Bloque la **validation E2E réelle** avant pilote.
+- **Action** : envoyer demande officielle à l'équipe MovePlanner avec certificat mTLS de test + endpoint webhook tunneling
 - **Responsable** : PO / fondateur
-- **ETA** : S1
-- **Mitigation** : mock server OpenAPI local (`apps/mock-moveplanner`) si délai > 10 j
-
-### ✅ BLOCKER-003 — Hosting **résolu côté décision** (GCP europe-west6)
-
-- **Ouvert le** : 2026-04-21 — **Clos le** : 2026-04-21 (décision)
-- **Décision** : GCP `europe-west6` (Zurich). Voir `docs/adr/0002-hosting-choice.md`.
-- **Reste** : DETTE-015 — provisioning effectif (Cloud SQL + Memorystore + Cloud Storage + Secret Manager + OIDC WIF + DPA Google Cloud Switzerland GmbH). Action humaine, pas de blocker dev.
-
-### ✅ BLOCKER-004 — Auth **résolu côté décision + code** (Firebase Identity Platform)
-
-- **Ouvert le** : 2026-04-21 — **Clos le** : 2026-04-21
-- **Décision** : Firebase Identity Platform, multi-tenancy native, un `tenantId` = une agence. Voir `docs/adr/0003-auth-choice.md`.
-- **Code posé** : RBAC typé (`@interim/domain/auth/role`), `TokenVerifier` abstrait + implémentation Firebase, `authMiddleware` avec gates email_verified + mfa_required, 13 tests verts.
-- **Reste** : DETTE-014 — créer les projets Firebase `interim-agency-system` + `-staging`, activer les providers, poser le service account JSON. Suivre `docs/firebase-setup.md`. Action humaine fondateur.
+- **ETA** : avant A6.7 (go-live)
+- **Mitigation** : mock server OpenAPI local complet (`apps/mock-moveplanner`) — DETTE-006 à clore pour couverture totale
 
 ### 🔴 BLOCKER-002 — Autorisation cantonale LSE
 
 - **Ouvert le** : 2026-04-21
-- **Bloque** : go-live pilote (A.6.7). **Ne bloque pas** le dev du MVP mais bloque l'exploitation commerciale.
-- **Action** : dépôt du dossier au SCTP/OCE du canton, fournir organigramme, caution bancaire (variable selon canton)
+- **Bloque** : go-live pilote (A6.7). **Ne bloque pas** le dev du MVP mais bloque l'exploitation commerciale.
+- **Action** : dépôt du dossier au SCTP/OCE du canton, fournir organigramme, caution bancaire
 - **Responsable** : fondateur + juriste
-- **ETA** : 4 à 12 semaines selon canton (GE/VD généralement 2-3 mois)
+- **ETA** : 4 à 12 semaines selon canton
 - **Mitigation** : démarrer le pilote sous autorisation d'un partenaire déjà autorisé (portage) si pas reçu à temps
+
+### ✅ BLOCKER-003 — Hosting **résolu côté décision** (GCP europe-west6)
+- Décision figée. Provisioning effectif = DETTE-015 (action humaine).
+
+### ✅ BLOCKER-004 — Auth **résolu côté décision + code** (Firebase Identity Platform)
+- Décision figée + code RBAC + middleware posés. Création projets Firebase = DETTE-014 (action humaine).
 
 ---
 
-## 5. Dettes techniques qualifiées (TODO trackés)
+## 5. Dettes techniques qualifiées
 
-| ID | Ouverte le | Prompt déclencheur | Description | Priorité | ETA |
-|----|-----------|-------------------|-------------|----------|-----|
-| DETTE-001 | 2026-04-21 | A0.1 | Composite TS + project refs (**reportée A.6 hardening** — runtime tsx du Dockerfile API, pas besoin d'un build TS intermédiaire à ce stade) | M | A6 |
-| ~~DETTE-002~~ | ~~2026-04-21~~ | ~~A0.1~~ | ~~Créer repo GitHub, pousser la branche et ouvrir la PR~~ — **fermée 2026-04-21, repo `kreuille/interim-agency-system` créé, PR #1 ouverte** | ~~H~~ | ✅ |
-| ~~DETTE-003~~ | 2026-04-21 | A0.1 | ~~pnpm approve-builds~~ — **fermée 2026-04-22** : whitelist `pnpm.onlyBuiltDependencies` (esbuild + prisma + @prisma/client + @prisma/engines) en place depuis A0.5 | ~~L~~ | ✅ |
-| ~~DETTE-004~~ | 2026-04-21 | A0.1 | ~~Hook pré-commit typecheck~~ — **fermée 2026-04-22** : `.husky/pre-commit` exécute `pnpm typecheck` après lint-staged | ~~L~~ | ✅ |
-| ~~DETTE-005~~ | 2026-04-21 | A0.2 | ~~Container `api` dans docker-compose~~ — **fermée 2026-04-22** : `apps/api/Dockerfile` multi-stage + service `api` profil `e2e`. Smoke test `/health` OK | ~~M~~ | ✅ |
-| DETTE-006 | 2026-04-21 | A0.2 | Compléter les endpoints du mock MovePlanner (couverture totale de docs/02) | L | A3 / A4 |
-| ~~DETTE-007~~ | 2026-04-21 | A0.3 | ~~Appliquer branch protection sur `main` via `gh api`~~ — **requalifiée DETTE-013** : feature payante sur repo privé | ~~H~~ | voir DETTE-013 |
-| DETTE-008 | 2026-04-21 | A0.3 | Durcir `pnpm audit` en bloquant (retirer `\|\| true`) une fois Dependabot a nettoyé le backlog | L | A6.6 |
-| ~~DETTE-009~~ | 2026-04-21 | A0.3 | ~~Job CI `build-api`~~ — **fermée 2026-04-22** : workflow `build-api` ajouté à `ci.yml` (build + smoke run `curl /health`) | ~~M~~ | ✅ |
-| ~~DETTE-010~~ | 2026-04-21 | A0.5 | ~~Wrapper Prisma middleware qui injecte `where: { agencyId }`~~ — **fermée 2026-04-21** : remplacée par tenant-guard defense-in-depth (DETTE-019). L'injection automatique s'est avérée risquée (bypass involontaire) ; la garde de vérification est plus sûre | ~~H~~ | ✅ |
-| ~~DETTE-011~~ | 2026-04-21 | A0.5 | ~~Tests intégration Prisma Testcontainers~~ — **fermée 2026-04-22** : `worker.repository.integration.test.ts` (6 tests) + `vitest.integration.config.ts` + job CI `test-integration` | ~~H~~ | ✅ |
-| ~~DETTE-012~~ | 2026-04-21 | A0.5 | ~~Container `api` dans docker-compose pour E2E~~ — **fermée 2026-04-22** : couverte par DETTE-005 (service `api` profile `e2e`) | ~~M~~ | ✅ |
-| ~~DETTE-013~~ | 2026-04-21 | déblocage | ~~Branch protection/Rulesets GitHub~~ — **fermée 2026-04-21** : repo passé public, ruleset `main-protection` créé (id 15364662), secret scanning + push protection + Dependabot alerts activés | ~~H~~ | ✅ |
-| DETTE-014 | 2026-04-21 | déblocage | Créer projets Firebase `interim-agency-system` + `-staging` selon `docs/firebase-setup.md` | H | S1 |
-| DETTE-015 | 2026-04-21 | déblocage | Provisionner GCP `europe-west6` (Cloud SQL, Memorystore, Cloud Storage, Secret Manager, OIDC WIF) selon ADR-0002 | H | S2 |
-| DETTE-016 | 2026-04-21 | déblocage | Cloud Function `onCreate` qui pose les custom claims `agencyId` + `role` à l'inscription | M | A1.7 |
-| ~~DETTE-017~~ | 2026-04-21 | A1.1 | ~~`Idempotency-Key` cache inbound pour POST/PUT workers~~ — **fermée 2026-04-21** : middleware + Prisma store + 7 tests + wired dans `/api/v1` | ~~M~~ | ✅ |
-| ~~DETTE-018~~ | 2026-04-21 | A1.1 | ~~Coverage CI enforcement~~ — **fermée 2026-04-21** : `@vitest/coverage-v8` + seuils par workspace + job CI `test-coverage` avec upload artifact HTML | ~~M~~ | ✅ |
-| ~~DETTE-019~~ | 2026-04-21 | A1.1 | ~~Prisma middleware tenant-injection~~ — **fermée 2026-04-21** : `installTenantGuard` via `$extends` + `assertTenantConsistent` fonction pure + 7 tests. Complète ~~DETTE-010~~ également | ~~H~~ | ✅ |
-| ~~DETTE-020~~ | 2026-04-21 | A1.2 | ~~Wire `ObjectStorage` réel GCP Cloud Storage CMEK~~ — **fermée 2026-04-22** : adapter `GcsObjectStorage` (Storage SDK + `kmsKeyName` CMEK + signed URL V4). Wire prod conditionnel via `OBJECT_STORAGE_PROVIDER=gcs`. Activation effective attend DETTE-015 | ~~M~~ | ✅ |
-| ~~DETTE-021~~ | 2026-04-21 | A1.2 | ~~Wire `AntivirusScanner` réel + queue BullMQ~~ — **fermée 2026-04-22** : refactor scan en async via port `ScanQueue` + `ApplyScanResultUseCase`. Adapters `ClamavAntivirusScanner` (TCP clamd 3310) + `BullMqScanQueue`. ClamAV ajouté docker-compose. Worker consumer `apps/worker/src/scan-worker.ts` | ~~M~~ | ✅ |
-| ~~DETTE-022~~ | 2026-04-21 | A1.2 | ~~OCR best-effort pour pré-remplir `expiresAt`~~ — **fermée 2026-04-22** : port `OcrExtractor` + `NoOpOcrExtractor` adapter (no-op). Use case appelle l'OCR si `expiresAt` non fourni. Tesseract en sprint A.6 si besoin métier confirmé | ~~M~~ | ✅ |
-| ~~DETTE-023~~ | 2026-04-21 | A1.2 | ~~Durcir coverage api branches 65% → 70%~~ — **fermée 2026-04-22** : seuils api remontés à 80% lines / 70% branches / 80% statements / 80% functions. 10 tests edge-cases ajoutés. Coverage actuelle : 87.24% lines / 75.24% branches | ~~M~~ | ✅ |
+### Dettes ouvertes (5)
+
+| ID | Ouverte le | Description | Priorité | ETA |
+|----|------------|-------------|----------|-----|
+| DETTE-006 | 2026-04-21 | Compléter les endpoints du mock MovePlanner (couverture totale de docs/02) | M | A3 ✅ partiel — finir avant pilote |
+| DETTE-008 | 2026-04-21 | Durcir `pnpm audit` en bloquant (retirer `\|\| true`) une fois Dependabot a nettoyé le backlog | L | A6.6 |
+| DETTE-014 | 2026-04-21 | Créer projets Firebase `interim-agency-system` + `-staging` selon `docs/firebase-setup.md` | H | Avant A6.7 |
+| DETTE-015 | 2026-04-21 | Provisionner GCP `europe-west6` selon ADR-0002 (Cloud SQL, Memorystore, Cloud Storage, Secret Manager, OIDC WIF) | H | Avant A6.7 |
+| DETTE-016 | 2026-04-21 | Cloud Function `onCreate` qui pose les custom claims `agencyId` + `role` à l'inscription | M | A1.7 ✅ partiel — wire prod attend DETTE-014 |
+
+### Dettes fermées (23)
+
+DETTE-001 (composite TS, reportée A.6) · DETTE-002 (repo GitHub) · DETTE-003 (pnpm approve-builds) · DETTE-004 (husky pre-commit) · DETTE-005/009/012 (API Docker container) · DETTE-007 (branch protection — requalifiée DETTE-013) · DETTE-010 (Prisma tenant injection — remplacée par DETTE-019) · DETTE-011 (Testcontainers integration tests) · DETTE-013 (repo public + main ruleset) · DETTE-017 (Idempotency-Key inbound) · DETTE-018 (coverage CI enforcement) · DETTE-019 (tenant-guard $extends) · DETTE-020 (GCS CMEK) · DETTE-021 (ClamAV scan async) · DETTE-022 (OCR no-op port) · DETTE-023 (coverage api 70%) · DETTE-024 à 028 (SMS i18n + CSV export + SSE stream + Prisma MissionContract + observability metrics + tracing — closed in PRs #48/49/50) · DETTE-029 à 032 (WorkerAvailability Prisma + reminders delayed + various) · DETTE A.4 backend dettes (controllers + ports + GED purge worker via PR #57)
+
+### Nouvelles dettes ouvertes ce sprint
+
+*(aucune — la session de design Helvètia + fix dev server n'a pas introduit de dette qualifiée)*
 
 ---
 
@@ -205,13 +265,19 @@ Décisions prises et non renégociables sans ADR. Mettre à jour au fil de l'eau
 
 | Métrique | Valeur | Cible | Tendance |
 |----------|--------|-------|----------|
-| Prompts completed / semaine | — | 4–6 | — |
-| Couverture tests globale | — | ≥ 70% | — |
-| Couverture domain | — | ≥ 85% | — |
-| Blockers conformité ouverts | 1 (LSE) | 0 avant go-live | — |
-| Dettes techniques qualifiées | 0 | < 10 | — |
-| PR avec revue humaine | — | 100% | — |
-| Incidents staging / sem | — | < 2 | — |
+| Prompts completed catalogue | 42 / 48 (87.5%) | 100% (S14) | 🟢 en avance |
+| Prompts completed total (catalogue + ad-hoc + OPS) | 44 / 53 | 53 | 🟢 |
+| Tests unit + integration | **1081 unit + 6 integration** | ≥ couverture seuils | 🟢 |
+| Couverture domain | 100% (mesurée A1.1) | ≥ 85% | 🟢 |
+| Couverture shared | 96.58% | ≥ 80% | 🟢 |
+| Couverture application | 84.14% | ≥ 80% | 🟢 |
+| Couverture api | 87.24% lines / 75.24% branches | ≥ 80%/70% | 🟢 |
+| Blockers conformité ouverts | 1 (LSE — externe) | 0 avant go-live | 🟡 |
+| Blockers techniques ouverts | 1 (sandbox MP — externe) | 0 avant go-live | 🟡 |
+| Dettes techniques qualifiées | 5 ouvertes (toutes externes ou A.6) / 23 fermées | < 10 ouvertes | 🟢 |
+| PR avec revue humaine | 100% (toutes les 50+ PRs mergées via gh admin merge) | 100% | 🟢 |
+| Vélocité observée (prompts/jour) | ~14 (sprint marathon 36h) | 4–6 régime de croisière | 🟢 |
+| Incidents staging / sem | n/a (pas encore staging) | < 2 | — |
 
 ---
 
@@ -228,13 +294,29 @@ Décisions prises et non renégociables sans ADR. Mettre à jour au fil de l'eau
 
 ---
 
-## 8. Historique des revues d'orchestration (weekly)
-
-*(à compléter chaque vendredi via OPS.weekly-review.md)*
+## 8. Historique des revues d'orchestration
 
 | Semaine | Prompts completed | Vélocité | Blockers ajoutés/clos | Notes |
 |---------|-------------------|----------|----------------------|-------|
+| 2026-W17 (en cours) | 42 catalogue + 2 ad-hoc | exceptionnelle (sprint marathon) | 0 ajoutés / 2 clos (B-003, B-004 décision) | Resynchro PROGRESS le 2026-04-23 |
 
 ---
 
-**Fin de PROGRESS.md — instantané initial du 2026-04-21**
+## 9. Notes de resynchronisation 2026-04-23
+
+PROGRESS.md précédent indiquait "Sprint courant A.1, 5/53 prompts completés" alors que **42/48 prompts catalogue étaient en réalité mergés**. Cause : les sessions A1.2 → A6.4 + design Helvètia ont mis à jour SESSION-LOG.md et le code, mais pas systématiquement PROGRESS.md.
+
+**Méthode de resynchro** :
+1. `git log --oneline` (66 commits sur main depuis bootstrap)
+2. `gh pr list --state merged --limit 100` (52 PRs mergées)
+3. Croisement nom de PR ↔ nom de prompt (ex: `feat/A4.5-timesheet-inbound` → `A4.5-timesheet-inbound`)
+4. Inspection code physique (`packages/domain/src/payroll/surcharge-rules.ts` confirme A5.2 inclus dans A5.1)
+5. `pnpm -r test` → 1081 tests verts (vs 206 dans l'ancien PROGRESS)
+
+**Décisions de remise au propre du working tree** :
+- Stash `next-env.d.ts` (autogen Next dev) → **dropped** (sans valeur, régénéré à chaque dev)
+- `.design-tmp/` (bundle design extrait) → **gitignored** (artefact one-shot, déjà utilisé pour PR #68)
+
+---
+
+**Fin de PROGRESS.md — instantané resynchronisé 2026-04-23**
