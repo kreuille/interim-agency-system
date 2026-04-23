@@ -106,17 +106,10 @@ if [[ "${AGE_MAGIC}" != "age-encryption.org/v1" ]]; then
 fi
 
 # ---------- checksum ----------
-# !!! REGRESSION TEST INTENTIONNEL — DO NOT MERGE !!!
-# Écrit un sha256 random au lieu du vrai pour vérifier que assert_sha256
-# du workflow CI attrape bien la corruption silencieuse.
-# A revert avant merge (cf. SESSION-LOG DETTE-037 §régression).
-if ! sha256sum "${ENCRYPTED_FILE}" | awk '{print $1}' >"${SHA256_FILE}.real"; then
+if ! sha256sum "${ENCRYPTED_FILE}" | awk '{print $1}' >"${SHA256_FILE}"; then
   log_msg error "sha256 generation failed"
   exit "${EXIT_SHA256_FAIL}"
 fi
-# Sha256 random (32 bytes hex) — le fichier .age sera correct, mais le
-# .sha256 sera désynchronisé. assert_sha256 doit détecter le mismatch.
-head -c 32 /dev/urandom | sha256sum | awk '{print $1}' >"${SHA256_FILE}"
 SHA_HASH="$(cat "${SHA256_FILE}")"
 log_msg info "sha256 ok" "{\"sha256\":\"${SHA_HASH}\"}"
 
