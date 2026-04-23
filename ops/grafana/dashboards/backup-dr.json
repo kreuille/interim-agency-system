@@ -14,7 +14,7 @@
       "title": "Dernier pg_dump réussi",
       "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
       "datasource": { "uid": "prometheus", "type": "prometheus" },
-      "targets": [{ "expr": "time() - pg_dump_last_success_timestamp", "refId": "A" }],
+      "targets": [{ "expr": "time() - pg_dump_last_success_timestamp_seconds", "refId": "A" }],
       "fieldConfig": {
         "defaults": {
           "unit": "s",
@@ -64,7 +64,13 @@
       "title": "RTO empirique (dernier test DR)",
       "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
       "datasource": { "uid": "prometheus", "type": "prometheus" },
-      "targets": [{ "expr": "max(dr_restore_duration_seconds)", "refId": "A" }],
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(dr_restore_test_rto_seconds_bucket[7d])))",
+          "refId": "A",
+          "legendFormat": "p95 RTO 7j"
+        }
+      ],
       "fieldConfig": {
         "defaults": {
           "unit": "s",
@@ -80,10 +86,86 @@
       }
     },
     {
+      "id": 5,
+      "type": "stat",
+      "title": "RPO empirique (dernier test DR)",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 4 },
+      "datasource": { "uid": "prometheus", "type": "prometheus" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(dr_restore_test_rpo_seconds_bucket[7d])))",
+          "refId": "A",
+          "legendFormat": "p95 RPO 7j"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 600 },
+              { "color": "red", "value": 900 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Tests DR — runs success vs failed (30j)",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 4 },
+      "datasource": { "uid": "prometheus", "type": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (status) (increase(dr_restore_test_runs_total[30d]))",
+          "refId": "A",
+          "legendFormat": "{{status}}"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "stat",
+      "title": "Dernier WAL archive (âge)",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 4 },
+      "datasource": { "uid": "prometheus", "type": "prometheus" },
+      "targets": [{ "expr": "time() - wal_archive_last_success_timestamp_seconds", "refId": "A" }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 600 },
+              { "color": "red", "value": 1800 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 8,
+      "type": "stat",
+      "title": "pg_dump runs total (30j)",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 4 },
+      "datasource": { "uid": "prometheus", "type": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (status) (increase(pg_dump_runs_total[30d]))",
+          "refId": "A",
+          "legendFormat": "{{status}}"
+        }
+      ]
+    },
+    {
       "id": 10,
       "type": "timeseries",
       "title": "pg_dump : taille du dump quotidien (30 jours)",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
       "datasource": { "uid": "prometheus", "type": "prometheus" },
       "targets": [
         { "expr": "max(pg_dump_size_bytes)", "refId": "A", "legendFormat": "size (bytes)" }
@@ -93,11 +175,20 @@
     {
       "id": 11,
       "type": "timeseries",
-      "title": "Test DR : RTO empirique (12 derniers tests mensuels)",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "title": "Test DR : RTO empirique p50/p95 (12 derniers tests mensuels)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
       "datasource": { "uid": "prometheus", "type": "prometheus" },
       "targets": [
-        { "expr": "max(dr_restore_duration_seconds)", "refId": "A", "legendFormat": "RTO (s)" }
+        {
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(dr_restore_test_rto_seconds_bucket[365d])))",
+          "refId": "p50",
+          "legendFormat": "p50 RTO"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(dr_restore_test_rto_seconds_bucket[365d])))",
+          "refId": "p95",
+          "legendFormat": "p95 RTO"
+        }
       ],
       "fieldConfig": {
         "defaults": {

@@ -10,3 +10,4 @@ export * from './email.js';
 export * from './phone.js';
 export * from './magic-bytes.js';
 export * from './ide.js';
+export * from './observability/prom-registry.js';

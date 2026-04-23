@@ -4,7 +4,7 @@
   "tags": ["interim", "moveplanner", "integration"],
   "timezone": "Europe/Zurich",
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "refresh": "30s",
   "time": { "from": "now-3h", "to": "now" },
   "panels": [
@@ -14,7 +14,13 @@
       "title": "Circuit Breaker State",
       "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
       "datasource": { "uid": "prometheus", "type": "prometheus" },
-      "targets": [{ "expr": "mp_cb_state{name=\"moveplanner\"}", "refId": "A" }],
+      "targets": [
+        {
+          "expr": "max(mp_circuit_breaker_state) or max(mp_cb_state{name=\"moveplanner\"})",
+          "refId": "A",
+          "legendFormat": "{{endpoint}}"
+        }
+      ],
       "fieldConfig": {
         "defaults": {
           "mappings": [
@@ -62,7 +68,7 @@
       "title": "Outbox lag (s)",
       "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
       "datasource": { "uid": "prometheus", "type": "prometheus" },
-      "targets": [{ "expr": "max(availability_outbox_oldest_pending_seconds)", "refId": "A" }],
+      "targets": [{ "expr": "max(availability_outbox_lag_seconds)", "refId": "A" }],
       "fieldConfig": {
         "defaults": {
           "unit": "s",
