@@ -1,0 +1,68 @@
+# Règles d'alerte P1 (on-call immédiat) — stack observabilité Helvètia Intérim
+#
+# Routées vers Alertmanager → receiver `on-call` (SMS Swisscom + Slack
+# `#incidents` channel). Voir `ops/alertmanager/alertmanager.yml`.
+#
+# Référence : `skills/dev/observability/SKILL.md` § Alertes prioritaires
+# Référence : `skills/ops/release-management/SKILL.md` § Gestion d'incident
+# Référence : `docs/runbooks/` (chaque alerte pointe vers son runbook)
+
+groups:
+  - name: api-availability
+    interval: 30s
+    rules:
+      # API totalement injoignable (no /metrics scraped)
+      - alert: ApiDown
+        expr: up{job="interim-api"} == 0
+        for: 5m
+        labels:
+          severity: P1
+          service: api
+        annotations:
+          summary: 'API back-office injoignable depuis {{ $value }} secondes'
+          runbook: "docs/runbooks/database-down.md (vérifier d'abord la DB, puis le pod API)"
+          impact: 'Aucune mutation possible : workers, missions, timesheets, paie, factures bloqués'
+
+      # Taux d'erreur 5xx > 2% sur 5 min — dégradation grave
+      - alert: ApiHigh5xxRate
+        expr: |
+          sum(rate(http_request_duration_seconds_count{job="interim-api",status=~"5.."}[5m]))
+            /
+          sum(rate(http_request_duration_seconds_count{job="interim-api"}[5m]))
+            > 0.02
+        for: 5m
+        labels:
+          severity: P1
+          service: api
+        annotations:
+          summary: 'Taux 5xx API > 2% ({{ $value | humanizePercentage }})'
+          runbook: 'Rechercher les exceptions Sentry des 5 dernières minutes pour identifier la cause racine'
+
+  - name: payroll-batch
+    interval: 30s
+    rules:
+      # Batch paie hebdo failed — bloquant légal (CCT impose paiement ≤ 5 jours)
+      - alert: PayrollBatchFailed
+        expr: increase(payroll_batch_failed_total[1h]) > 0
+        labels:
+          severity: P1
+          service: api
+          domain: payroll
+        annotations:
+          summary: 'Batch paie hebdo a échoué dans la dernière heure'
+          runbook: 'docs/runbooks/payroll-batch-failed.md'
+          impact: 'Risque de retard de paiement intérimaires — SLA 24h max avant communication'
+
+  - name: queue-saturation
+    interval: 30s
+    rules:
+      # Queue BullMQ backlog > 1000 jobs en attente
+      - alert: BullmqBacklogTooHigh
+        expr: bullmq_jobs_waiting{queue=~".+"} > 1000
+        for: 10m
+        labels:
+          severity: P1
+          service: worker
+        annotations:
+          summary: 'Queue BullMQ {{ $labels.queue }} a {{ $value }} jobs en attente'
+          runbook: "Scaler les workers ; vérifier qu'aucun job ne plante en boucle (DLQ)"

@@ -1,0 +1,91 @@
+# Alertmanager — routage des alertes Prometheus.
+#
+# Trois receivers selon la sévérité :
+#   - P1 → on-call (SMS Swisscom + Slack #incidents) : prod down, 5xx élevé,
+#     batch paie échoué
+#   - P2 → dev-team (Slack #alerts) : dégradation, latence, MP CB ouvert
+#   - P3 → tickets (créateur Linear) : warning capacity, business
+#
+# Configuration runtime : remplacer les `<...>` par les vraies URLs en
+# montant un secret K8s ou via env substitution Compose. Garder les
+# secrets HORS du repo (cf. CLAUDE.md §3.4).
+
+global:
+  resolve_timeout: 5m
+  slack_api_url: '<SLACK_WEBHOOK_URL>' # injecté via env
+
+# Templates customisés (timestamps Europe/Zurich, lien runbook clickable)
+templates:
+  - /etc/alertmanager/templates/*.tmpl
+
+route:
+  group_by: ['alertname', 'service']
+  group_wait: 10s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: dev-team # default fallback
+
+  routes:
+    # P1 — on-call immédiat, pas de groupage
+    - match:
+        severity: P1
+      receiver: on-call
+      group_wait: 0s
+      group_interval: 1m
+      repeat_interval: 30m
+      continue: true # envoie aussi à dev-team pour visibilité équipe
+
+    # P2 — Slack dev-team
+    - match:
+        severity: P2
+      receiver: dev-team
+      repeat_interval: 2h
+
+    # P3 — créateur de tickets
+    - match:
+        severity: P3
+      receiver: tickets
+      repeat_interval: 24h
+
+receivers:
+  - name: on-call
+    slack_configs:
+      - channel: '#incidents'
+        send_resolved: true
+        title: '🔴 P1 [{{ .Status | toUpper }}] {{ .GroupLabels.alertname }}'
+        text: |-
+          {{ range .Alerts }}
+          *Service*: {{ .Labels.service }}
+          *Summary*: {{ .Annotations.summary }}
+          *Runbook*: {{ .Annotations.runbook }}
+          *Impact*: {{ .Annotations.impact }}
+          {{ end }}
+    # Pour SMS Swisscom : passerelle webhook custom (à wire en sprint A.7)
+    webhook_configs:
+      - url: 'http://oncall-sms-bridge:8080/page'
+        send_resolved: false
+
+  - name: dev-team
+    slack_configs:
+      - channel: '#alerts'
+        send_resolved: true
+        title: '🟠 P2 [{{ .Status | toUpper }}] {{ .GroupLabels.alertname }}'
+        text: |-
+          {{ range .Alerts }}
+          *Service*: {{ .Labels.service }}
+          *Summary*: {{ .Annotations.summary }}
+          {{ if .Annotations.runbook }}*Runbook*: {{ .Annotations.runbook }}{{ end }}
+          {{ end }}
+
+  - name: tickets
+    webhook_configs:
+      - url: 'http://linear-webhook-bridge:8080/create-issue'
+        send_resolved: false
+
+# Inhibitions : si l'API est down, ne pas alerter sur p95 latence (bruit)
+inhibit_rules:
+  - source_match:
+      alertname: ApiDown
+    target_match_re:
+      alertname: 'Api.*'
+    equal: ['service']

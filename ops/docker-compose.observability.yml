@@ -1,0 +1,129 @@
+# Stack observabilité Helvètia Intérim — runnable en local.
+#
+# Usage :
+#   cd ops/
+#   docker compose -f docker-compose.observability.yml up -d
+#   open http://localhost:3000  (Grafana, login admin/admin)
+#
+# Ports exposés :
+#   3000 → Grafana UI
+#   3100 → Loki (query API)
+#   3200 → Tempo (query API)
+#   4317 → Tempo OTLP gRPC (apps push ici)
+#   4318 → Tempo OTLP HTTP (apps push ici)
+#   9090 → Prometheus UI
+#   9093 → Alertmanager UI
+#
+# Avec l'API démarrée en parallèle (`pnpm -F @interim/api dev`) :
+#   - Prometheus scrape http://host.docker.internal:3000/metrics (override le job api)
+#   - Promtail scrape les logs Docker des containers labellisés `com.docker.compose.project=interim`
+#   - L'API exporte les traces vers OTLP http://localhost:4318 (set OTEL_EXPORTER_OTLP_ENDPOINT)
+
+name: interim-observability
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.55.0
+    container_name: interim-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=30d'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus-data:/prometheus
+    ports:
+      - '9090:9090'
+    restart: unless-stopped
+    labels:
+      com.docker.compose.project: interim
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: interim-alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    ports:
+      - '9093:9093'
+    restart: unless-stopped
+    labels:
+      com.docker.compose.project: interim
+
+  loki:
+    image: grafana/loki:3.2.0
+    container_name: interim-loki
+    command: -config.file=/etc/loki/loki-config.yml
+    volumes:
+      - ./loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - loki-data:/tmp/loki
+    ports:
+      - '3100:3100'
+    restart: unless-stopped
+    labels:
+      com.docker.compose.project: interim
+
+  promtail:
+    image: grafana/promtail:3.2.0
+    container_name: interim-promtail
+    command: -config.file=/etc/promtail/promtail-config.yml
+    volumes:
+      - ./promtail/promtail-config.yml:/etc/promtail/promtail-config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - promtail-positions:/tmp
+    depends_on:
+      - loki
+    restart: unless-stopped
+    labels:
+      com.docker.compose.project: interim
+
+  tempo:
+    image: grafana/tempo:2.6.0
+    container_name: interim-tempo
+    command: ['-config.file=/etc/tempo/tempo-config.yml']
+    volumes:
+      - ./tempo/tempo-config.yml:/etc/tempo/tempo-config.yml:ro
+      - tempo-data:/var/tempo
+    ports:
+      - '3200:3200' # query API
+      - '4317:4317' # OTLP gRPC
+      - '4318:4318' # OTLP HTTP
+    restart: unless-stopped
+    labels:
+      com.docker.compose.project: interim
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: interim-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_AUTH_ANONYMOUS_ENABLED: 'false'
+      GF_INSTALL_PLUGINS: ''
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/etc/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - '3000:3000'
+    depends_on:
+      - prometheus
+      - loki
+      - tempo
+    restart: unless-stopped
+    labels:
+      com.docker.compose.project: interim
+
+volumes:
+  prometheus-data:
+  alertmanager-data:
+  loki-data:
+  promtail-positions:
+  tempo-data:
+  grafana-data:

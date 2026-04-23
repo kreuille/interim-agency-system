@@ -1,0 +1,74 @@
+{
+  "uid": "queue-depth",
+  "title": "BullMQ queues — depth & workers",
+  "tags": ["interim", "queue", "workers"],
+  "timezone": "Europe/Zurich",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "table",
+      "title": "État des queues",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
+      "datasource": { "uid": "prometheus", "type": "prometheus" },
+      "targets": [
+        {
+          "expr": "bullmq_jobs_waiting",
+          "refId": "waiting",
+          "legendFormat": "{{queue}}",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "expr": "bullmq_jobs_active",
+          "refId": "active",
+          "legendFormat": "{{queue}}",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "expr": "bullmq_jobs_completed",
+          "refId": "completed",
+          "legendFormat": "{{queue}}",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "expr": "bullmq_jobs_failed",
+          "refId": "failed",
+          "legendFormat": "{{queue}}",
+          "format": "table",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Jobs en attente (waiting) par queue",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "uid": "prometheus", "type": "prometheus" },
+      "targets": [{ "expr": "bullmq_jobs_waiting", "refId": "A", "legendFormat": "{{queue}}" }]
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Jobs failed par queue (cumul DLQ)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "uid": "prometheus", "type": "prometheus" },
+      "targets": [{ "expr": "bullmq_jobs_failed", "refId": "A", "legendFormat": "{{queue}}" }]
+    },
+    {
+      "id": 20,
+      "type": "logs",
+      "title": "Logs workers (level=error|warn)",
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 16 },
+      "datasource": { "uid": "loki", "type": "loki" },
+      "targets": [{ "expr": "{service=\"worker\", level=~\"error|warn\"}", "refId": "A" }],
+      "options": { "showTime": true, "wrapLogMessage": true, "sortOrder": "Descending" }
+    }
+  ]
+}

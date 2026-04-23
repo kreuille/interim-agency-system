@@ -1,0 +1,60 @@
+# Loki — log aggregation pour Helvètia Intérim
+#
+# Mode : monolithique (single binary), suffisant pour MVP et pilote.
+# Stockage : filesystem local (/tmp/loki) en dev — à migrer vers GCS
+# bucket en prod (config object_store + storage_config.gcs).
+#
+# Rétention : 12 mois (nLPD : pas plus, voir CLAUDE.md §3.4 + skill).
+# Logs avec PII redactées par le logger pino côté apps (pas de
+# post-processing PII ici — defense-in-depth source-side).
+
+auth_enabled: false # Pas de multi-tenancy Loki ici (un seul tenant Helvètia)
+
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9096
+  log_level: warn
+
+common:
+  instance_addr: 127.0.0.1
+  path_prefix: /tmp/loki
+  storage:
+    filesystem:
+      chunks_directory: /tmp/loki/chunks
+      rules_directory: /tmp/loki/rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+schema_config:
+  configs:
+    - from: 2026-01-01
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+# Rétention 12 mois (nLPD)
+limits_config:
+  retention_period: 8760h # 365 jours
+  max_query_length: 721h
+  reject_old_samples: true
+  reject_old_samples_max_age: 168h # 7 jours
+  ingestion_rate_mb: 10
+  ingestion_burst_size_mb: 20
+  max_global_streams_per_user: 10000
+
+compactor:
+  working_directory: /tmp/loki/compactor
+  retention_enabled: true
+  retention_delete_delay: 2h
+
+# Pas de ruler côté Loki ici — alerting par Prometheus uniquement.
+ruler:
+  alertmanager_url: http://alertmanager:9093
+
+analytics:
+  reporting_enabled: false

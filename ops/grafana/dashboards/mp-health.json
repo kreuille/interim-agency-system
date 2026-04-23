@@ -1,0 +1,153 @@
+{
+  "uid": "mp-health",
+  "title": "MovePlanner Integration — health",
+  "tags": ["interim", "moveplanner", "integration"],
+  "timezone": "Europe/Zurich",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-3h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Circuit Breaker State",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "uid": "prometheus", "type": "prometheus" },
+      "targets": [{ "expr": "mp_cb_state{name=\"moveplanner\"}", "refId": "A" }],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "options": {
+                "0": { "text": "CLOSED ✅", "color": "green" },
+                "1": { "text": "HALF-OPEN ⚠️", "color": "yellow" },
+                "2": { "text": "OPEN 🔴", "color": "red" }
+              },
+              "type": "value"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Push success rate (5min)",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "uid": "prometheus", "type": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(rate(mp_request_total{status=\"2xx\"}[5m])) / sum(rate(mp_request_total[5m]))",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.95 },
+              { "color": "green", "value": 0.99 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Outbox lag (s)",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "uid": "prometheus", "type": "prometheus" },
+      "targets": [{ "expr": "max(availability_outbox_oldest_pending_seconds)", "refId": "A" }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 300 },
+              { "color": "red", "value": 900 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Webhooks accepted (1h)",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "uid": "prometheus", "type": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(increase(inbound_webhook_received_total{outcome=\"accepted\"}[1h]))",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Outbound MP — request rate par endpoint",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "datasource": { "uid": "prometheus", "type": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (endpoint) (rate(mp_request_total[5m]))",
+          "refId": "A",
+          "legendFormat": "{{endpoint}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps" } }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Outbound MP — duration p95 par endpoint",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "datasource": { "uid": "prometheus", "type": "prometheus" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (endpoint, le) (rate(mp_request_duration_seconds_bucket[5m])))",
+          "refId": "A",
+          "legendFormat": "{{endpoint}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "id": 20,
+      "type": "timeseries",
+      "title": "Webhooks inbound — par event_type / outcome",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "datasource": { "uid": "prometheus", "type": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (event_type, outcome) (rate(inbound_webhook_received_total[5m]))",
+          "refId": "A",
+          "legendFormat": "{{event_type}} / {{outcome}}"
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "type": "timeseries",
+      "title": "Webhook dispatch duration p95",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "datasource": { "uid": "prometheus", "type": "prometheus" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (event_type, le) (rate(inbound_webhook_dispatch_duration_seconds_bucket[5m])))",
+          "refId": "A",
+          "legendFormat": "{{event_type}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    }
+  ]
+}

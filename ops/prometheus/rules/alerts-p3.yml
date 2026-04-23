@@ -1,0 +1,43 @@
+# Règles d'alerte P3 (warning, ticket Linear) — Helvètia Intérim
+#
+# Routées vers Alertmanager → receiver `tickets` (créateur de tickets).
+
+groups:
+  - name: capacity-planning
+    interval: 1m
+    rules:
+      # Disque > 85% plein
+      - alert: DiskFillingUp
+        expr: (node_filesystem_size_bytes - node_filesystem_avail_bytes) / node_filesystem_size_bytes > 0.85
+        for: 30m
+        labels:
+          severity: P3
+          service: infra
+        annotations:
+          summary: 'Disque {{ $labels.device }} sur {{ $labels.instance }} à {{ $value | humanizePercentage }}'
+
+      # Memory > 85%
+      - alert: MemoryHigh
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) > 0.85
+        for: 30m
+        labels:
+          severity: P3
+          service: infra
+        annotations:
+          summary: 'Mémoire {{ $labels.instance }} à {{ $value | humanizePercentage }}'
+
+  - name: business-warnings
+    interval: 1m
+    rules:
+      # Outbox availability lag > 15 min — indique que le drain BullMQ
+      # n'arrive pas à suivre la cadence (push MP)
+      - alert: OutboxAvailabilityLag
+        expr: max(availability_outbox_oldest_pending_seconds) > 900
+        for: 5m
+        labels:
+          severity: P3
+          service: api
+          domain: integration
+        annotations:
+          summary: 'Plus ancien push availability en attente : {{ $value | humanizeDuration }}'
+          runbook: 'Vérifier état circuit breaker MP + scaler workers'
