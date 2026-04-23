@@ -5,6 +5,95 @@
 
 ---
 
+## Session 2026-04-23 09:00 — Prompt A6.3 observability stack (clôture ops infra)
+
+- **Opérateur** : Claude Code (Sonnet 4.5) — déclencheur : user "exécute prompts/sprint-a6-compliance-golive/A6.3-observability-stack.md selon le protocole ORCHESTRATOR §3"
+- **Prompt exécuté** : `A6.3-observability-stack` — clôture ops infra (Grafana dashboards + Loki promtail + Alertmanager rules + docker-compose.observability)
+- **Sprint** : A.6
+- **Branche Git** : `feat/A6.3-observability-stack`
+- **Skills chargées** : `skills/dev/devops-swiss/SKILL.md`, `skills/ops/release-management/SKILL.md`, `skills/dev/observability/SKILL.md`
+- **Dépendances vérifiées** : OK — code Sentry/OTel/Prometheus déjà posé via PR #48 (DETTE-026/027). Reste à finir : configs YAML/JSON ops + pino logger structuré.
+- **Objectif de la session** : poser les configs Grafana/Loki/Alertmanager dans `ops/` + docker-compose local pour valider la stack sans dépendre d'un Grafana Cloud externe ; ajouter le pino logger avec redaction PII.
+
+### Déroulé
+
+1. **Code apps/api**
+   - Ajout deps `pino@9.x` + `pino-http@11.x` (`apps/api/package.json`)
+   - `apps/api/src/infrastructure/observability/logger.ts` : `createLogger()` factory pino avec config nLPD-compliant (PII redactée : iban, avs, email, phone, password, token, firstName, lastName, fullName + header Authorization), helper `hashWorkerId(id)` SHA-256 tronqué 16 hex chars pour pseudonymisation, singleton `getDefaultLogger()` lazy-init
+   - `apps/api/src/shared/middleware/request-id.middleware.ts` : middleware `X-Request-Id` / `X-Correlation-Id` (UUIDv4 par défaut, respecte le client si fourni, max 128 chars protection abuse)
+   - `apps/api/src/app.ts` : wire `requestIdMiddleware` + `pinoHttp` (genReqId pointe sur req.id du middleware, customLogLevel : error pour 5xx / warn pour 4xx / info sinon, désactivé en `NODE_ENV=test`)
+   - `apps/api/src/main.ts` : remplace `console.log` par `logger.info`, init Sentry avec sample rate 10% prod / 100% dev
+   - 14 nouveaux tests (8 logger + 5 request-id + 1 stub) → **235 tests** sur api (vs 221)
+
+2. **Configs ops/** (création complète)
+   - `ops/prometheus/prometheus.yml` : scrape api (port 3000) + worker (9090) + auto-monitoring
+   - `ops/prometheus/rules/alerts-p1.yml` : ApiDown, ApiHigh5xxRate, PayrollBatchFailed, BullmqBacklogTooHigh
+   - `ops/prometheus/rules/alerts-p2.yml` : ApiHighLatencyP95, ApiHigh4xxRate, MoveplannerCircuitBreakerOpen, MoveplannerPushFailureRate, WebhookHmacFailureRate
+   - `ops/prometheus/rules/alerts-p3.yml` : DiskFillingUp, MemoryHigh, OutboxAvailabilityLag
+   - `ops/alertmanager/alertmanager.yml` : routage P1→on-call (SMS Swisscom + Slack #incidents, repeat 30 min), P2→dev-team (Slack #alerts, repeat 2h), P3→tickets Linear (repeat 24h), inhibit ApiDown
+   - `ops/loki/loki-config.yml` : monolithique filesystem (/tmp/loki en dev → GCS prod), rétention 8760h (12 mois nLPD), ingestion 10MB/s
+   - `ops/promtail/promtail-config.yml` : scrape Docker socket pour les containers labellisés `com.docker.compose.project=interim`, parse JSON pino, promote level/service comme labels low-cardinality, drop debug en prod
+   - `ops/tempo/tempo-config.yml` : OTLP gRPC (4317) + HTTP (4318), rétention 360h (15 jours), local filesystem
+   - `ops/grafana/provisioning/datasources/datasources.yml` : Prometheus + Loki + Tempo avec cross-links (Prom exemplars → Tempo, Loki derived fields → Tempo, Tempo tracesToLogs → Loki + tracesToMetrics → Prom)
+   - `ops/grafana/provisioning/dashboards/dashboards.yml` : provider auto-load depuis filesystem
+   - 4 dashboards Grafana JSON :
+     - `api-health.json` : 4 stats (up/rate/5xx%/p95) + 2 timeseries (rate par route, p50/p95/p99) + logs error|warn
+     - `mp-health.json` : 4 stats (CB state/push success/outbox lag/webhooks 1h) + 4 timeseries (rate/p95 outbound, webhooks par event_type/outcome, dispatch p95)
+     - `payroll-batch.json` : 4 stats (durée/workers/échecs 7j/CHF brut) + timeseries 30j + logs payroll.batch
+     - `queue-depth.json` : table état queues + timeseries waiting/failed + logs workers
+   - `ops/docker-compose.observability.yml` : stack runnable localement (Prometheus + Alertmanager + Loki + Promtail + Tempo + Grafana, ports 3000/9090/9093/3100/3200/4317/4318)
+   - `ops/README.md` : usage local + bascule Grafana Cloud prod + alertes par sévérité + pseudonymisation nLPD + rétention par signal
+
+3. **QA**
+   - `pnpm typecheck` vert (8 workspaces)
+   - `pnpm lint` vert (corrections : `??=` operator + cast typage `req.id` vs pino-http augmentation)
+   - `pnpm -r test` : **1095 unit + 6 integration** verts
+   - Prettier write sur 14 fichiers nouveaux
+
+4. **PR + merge**
+   - PR #71 ouverte avec DoD complète + alertes par sévérité + conformité nLPD
+   - 8/8 CI checks verts (lint + format + typecheck + unit + integration + coverage + audit + docker smoke + build api)
+   - Merge admin rebase, branche supprimée, sync main local
+
+### Livrables
+
+- **9 nouveaux fichiers code** : `logger.ts`, `logger.test.ts`, `request-id.middleware.ts`, `request-id.middleware.test.ts` ; modifs `app.ts`, `main.ts`, `package.json`
+- **14 nouveaux fichiers ops** : prometheus (1 + 3 rules), alertmanager, loki, promtail, tempo, grafana (2 provisioning + 4 dashboards), docker-compose, README
+- **PR #71** mergée — commit `cd1b6b8`
+- Total LOC : +2378 / -8 (essentiellement des YAML/JSON ops + dashboards riches)
+
+### Décisions
+
+1. **pino-http désactivé en `NODE_ENV=test`** : sinon vitest pollue l'output avec 1 ligne JSON par requête supertest. Le middleware request-id reste actif pour que les tests vérifient le comportement.
+2. **Augmentation `Request.id`** : pino-http augmente déjà `Request.id: ReqId` (= `string | number | object`). On n'ajoute pas notre propre augmentation pour éviter le conflit `string | undefined` vs `ReqId` ; on cast localement `(req as Request & { id: string }).id` au point d'assignation.
+3. **Loki en mode monolithique single-binary filesystem** : suffisant pour MVP/pilote. Migration vers GCS object_store quand on dépassera 100GB de logs ou multi-zone (sprint A.7+).
+4. **Alertmanager `oncall-sms-bridge` documenté mais non-implémenté** : c'est un service custom à wire en sprint A.7 (passerelle Swisscom SMS API). Pour l'instant, le webhook config existe mais pointe nulle part.
+5. **Worker `/metrics` endpoint manquant** : noté dans la PR comme dette future. Le scrape config est déjà prêt à être activé quand on wire l'observabilité côté worker.
+6. **Pas de `metrics_generator` Tempo** : feature d'auto-génération de métriques RED depuis les traces. Activable plus tard (sprint A.7 capacity tuning).
+
+### Dettes ouvertes (nouvelles)
+
+- [ ] **DETTE-033** : Wire `/metrics` endpoint sur `apps/worker/main.ts` (port 9090) avec counters BullMQ par queue (`bullmq_jobs_waiting`, `bullmq_jobs_active`, `bullmq_jobs_failed`). Sans ça, les dashboards `queue-depth` et `mp-health` (outbox lag) restent vides.
+- [ ] **DETTE-034** : Implémenter `oncall-sms-bridge` (passerelle webhook → Swisscom SMS API) ou wire un service tiers (PagerDuty, Opsgenie). Sinon le receiver `on-call` Alertmanager n'envoie qu'à Slack.
+- [ ] **DETTE-035** : Métriques business `payroll_batch_*` et `availability_outbox_*` référencées par les dashboards mais pas encore exposées par le code. À ajouter dans le worker payroll-batch et le worker availability-sync (sprint A.7 ou DETTE-033 incluse).
+
+### Prochain prompt suggéré
+
+**`A6.5-backup-restore-dr-test` (M)** — préparation locale faisable (scripts pg_dump + restore + runbook DR avec docker-compose Postgres, test E2E roundtrip). Activation prod attend DETTE-015 (provisioning GCP). Débloquerait A6.7 (go-live) sur le critère "backup testé mensuellement" du skill devops-swiss.
+
+**Alternatives** :
+- **DETTE-033** (worker /metrics) : ferme la boucle observabilité côté worker, valeur immédiate pour les dashboards qui sont actuellement à moitié vides
+- **AH.003** (extension design Helvètia aux écrans non-couverts) : moins critique pour go-live mais visible UX
+
+### Métriques
+
+- **Prompts catalogue** : 43/48 (89.6%) — A6.3 fermé
+- **Tests** : **1095 unit + 6 integration** sur 8 workspaces (vs 1081 avant)
+- **Dettes** : 8 ouvertes (5 anciennes + 3 nouvelles A6.3) / 23 fermées
+- **Effort réel** : ~2.5h (vs M = 1 jour estimé) — la pré-existence du code Sentry/OTel/Prometheus a réduit le périmètre
+
+---
+
 ## Session 2026-04-23 06:30 — Resynchronisation PROGRESS.md (sprint marathon A1.2 → A6.4 + 2 ad-hoc)
 
 - **Opérateur** : Claude Code (Sonnet 4.5) — déclencheur : user "Avant toute chose : resynchronise PROGRESS.md avec l'état réel du repo"
