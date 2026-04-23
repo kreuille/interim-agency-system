@@ -10,7 +10,7 @@ jobs:
     name: Trivy filesystem scan
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: aquasecurity/trivy-action@0.28.0
         with:
           scan-type: fs
@@ -24,7 +24,7 @@ jobs:
     name: Trivy mock-moveplanner image scan
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Build mock-moveplanner image
         run: docker compose build mock-moveplanner
       - uses: aquasecurity/trivy-action@0.28.0

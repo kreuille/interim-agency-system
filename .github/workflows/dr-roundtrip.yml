@@ -64,7 +64,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Run shellcheck on ops/backup/*.sh
         # Pin sur master comme recommandé par les maintainers (l'action
@@ -89,7 +89,7 @@ jobs:
       RTO_BUDGET_SECONDS: ${{ github.event.inputs.rto_budget_seconds || '14400' }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install age (encryption)
         run: |
