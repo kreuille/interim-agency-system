@@ -13,6 +13,7 @@
 | Test E2E | `test-roundtrip.sh` | Dump → restore vers cible DR + verify rowcounts |
 | Worker mensuel | `apps/worker/src/dr-restore-test.worker.ts` | Wrapper BullMQ qui joue test-roundtrip.sh tous les 1ers du mois |
 | Compose DR | `../docker-compose.dr-test.yml` | Postgres cible `_dr` sur port 5433 |
+| Workflow CI | `.github/workflows/dr-roundtrip.yml` | Job mensuel + sur PR `ops/backup/*` (DETTE-037) |
 
 ## Préparation locale (1 fois)
 
@@ -147,6 +148,42 @@ Le script doit être déployé sur le node Postgres via Cloud SQL extension (ou 
 ```
 
 90 jours dumps quotidiens, 30 jours WAL. Au-delà : conformité nLPD (pas plus que nécessaire à la finalité).
+
+## CI : workflow `dr-roundtrip.yml` (DETTE-037)
+
+Le test E2E tourne automatiquement dans GitHub Actions :
+
+| Trigger | Quand |
+|---|---|
+| `schedule` cron `0 3 1 * *` | 1er du mois à 03h00 UTC (= 04h-05h Europe/Zurich) |
+| `pull_request` paths-filter | Toute PR qui touche `ops/backup/**`, `ops/docker-compose.dr-test.yml`, `docker-compose.yml` ou le workflow lui-même |
+| `workflow_dispatch` | Déclenchement manuel (gameday, debug). Inputs : `rto_budget_seconds`, `seed_rows_per_table` |
+
+Étapes du job (~5 min) :
+
+1. Install `age` + `postgresql-client-16` via apt-get
+2. Génère une paire de clés age **éphémère** dans `ops/backup/test-keys/` (jetée à la fin du job, jamais committée — `.gitignore` couvre déjà ce dossier)
+3. `docker compose up -d postgres postgres-dr` (avec override `dr-test.yml`)
+4. Wait healthy (timeout 60s)
+5. Seed source DB avec `SEED_ROWS=500` rows × 4 tables critiques (`temp_workers`, `mission_proposals`, `timesheets`, `audit_logs`)
+6. **Exécute `bash ops/backup/test-roundtrip.sh`** avec env `AGE_*` + `PG_*`
+7. Sur succès : log RTO empirique. Sur échec : upload artifact (recipient public uniquement, JAMAIS la clé privée), dump container logs, exit 1
+8. Cleanup containers + clés éphémères (`if: always()`)
+
+**Garde-fou** : timeout 30 min global. Si le job dépasse, c'est un blocage docker/network suspect (le test local prend < 5 min). Fail-fast.
+
+**Concurrence** : `cancel-in-progress: false` sur le cron mensuel — on ne tue jamais un test DR en cours, même si une PR concurrent push.
+
+### Quoi faire si le job CI échoue
+
+1. **Lire les logs** : artifact `dr-roundtrip-failure-<run-id>` + step "Dump container logs on failure"
+2. **Reproduire localement** : `cd ops && docker compose -f ../docker-compose.yml -f docker-compose.dr-test.yml up -d` puis `bash ops/backup/test-roundtrip.sh`
+3. **Causes courantes** :
+   - `age` non installé sur le runner → vérifier la step `Install age`
+   - Postgres pas healthy après 60s → augmenter `for i in $(seq 1 60)` dans `Wait for Postgres healthy`
+   - `pg_restore` échoue avec `extension uuid-ossp` manquante → ajouter `CREATE EXTENSION` dans le seed (à wire si on commence à utiliser `uuid_generate_v4()` côté app)
+   - Rowcounts divergents → script `pg_dump.sh` ou `pg_restore.sh` cassé. Reproduire local + bisect
+4. **Si non-régression confirmée mais flake** : ouvrir un ticket DETTE pour stabiliser (timeout réseau Docker Hub, etc.)
 
 ## Métriques exportées (Prometheus)
 
