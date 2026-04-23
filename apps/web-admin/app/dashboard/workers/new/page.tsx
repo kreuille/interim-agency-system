@@ -51,93 +51,106 @@ export default function NewWorkerPage() {
   }
 
   return (
-    <div className="card" style={{ maxWidth: 640 }}>
-      <h1>Nouvel intérimaire</h1>
-      <form
-        onSubmit={(e) => {
-          void handleSubmit(onSubmit)(e);
-        }}
-        noValidate
-        style={{ marginTop: 24 }}
-      >
-        <div className="field">
-          <label htmlFor="firstName">Prénom</label>
-          <input id="firstName" {...register('firstName')} aria-invalid={!!errors.firstName} />
-          {errors.firstName && (
-            <span className="error" role="alert">
-              {errors.firstName.message}
-            </span>
-          )}
-        </div>
-        <div className="field">
-          <label htmlFor="lastName">Nom</label>
-          <input id="lastName" {...register('lastName')} aria-invalid={!!errors.lastName} />
-          {errors.lastName && (
-            <span className="error" role="alert">
-              {errors.lastName.message}
-            </span>
-          )}
-        </div>
-        <div className="field">
-          <label htmlFor="avs">AVS</label>
-          <input
-            id="avs"
-            placeholder="756.1234.5678.97"
-            {...register('avs')}
-            aria-invalid={!!errors.avs}
-          />
-          {errors.avs && (
-            <span className="error" role="alert">
-              {errors.avs.message}
-            </span>
-          )}
-        </div>
-        <div className="field">
-          <label htmlFor="iban">IBAN</label>
-          <input
-            id="iban"
-            placeholder="CH93 0076 2011 6238 5295 7"
-            {...register('iban')}
-            aria-invalid={!!errors.iban}
-          />
-          {errors.iban && (
-            <span className="error" role="alert">
-              {errors.iban.message}
-            </span>
-          )}
-        </div>
-        <div className="field">
-          <label htmlFor="residenceCanton">Canton de résidence</label>
-          <select id="residenceCanton" {...register('residenceCanton')}>
-            {CANTONS.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="field">
-          <label htmlFor="email">Email (optionnel)</label>
-          <input id="email" type="email" {...register('email')} />
-          {errors.email && (
-            <span className="error" role="alert">
-              {errors.email.message}
-            </span>
-          )}
-        </div>
-        <div className="field">
-          <label htmlFor="phone">Téléphone (optionnel)</label>
-          <input id="phone" placeholder="+41 78 000 00 00" {...register('phone')} />
-        </div>
-        {submitError !== undefined && (
-          <p className="error" role="alert" style={{ marginBottom: 12 }}>
-            {submitError}
+    <div style={{ padding: 20 }}>
+      <div className="card" style={{ maxWidth: 640, padding: 20 }}>
+        <div style={{ marginBottom: 16 }}>
+          <div className="label">Création d&apos;un dossier</div>
+          <h1 style={{ fontSize: 16, fontWeight: 600, margin: '4px 0 0' }}>Nouvel intérimaire</h1>
+          <p style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 4 }}>
+            Renseignez les informations légales de l&apos;intérimaire (AVS, IBAN, canton). Les
+            permis et documents s&apos;ajoutent ensuite via la fiche.
           </p>
-        )}
-        <button type="submit" className="btn-primary" disabled={isSubmitting}>
-          {isSubmitting ? 'Enregistrement...' : 'Créer'}
-        </button>
-      </form>
+        </div>
+        <form
+          onSubmit={(e) => {
+            void handleSubmit(onSubmit)(e);
+          }}
+          noValidate
+        >
+          <div className="field">
+            <label htmlFor="firstName">Prénom</label>
+            <input id="firstName" {...register('firstName')} aria-invalid={!!errors.firstName} />
+            {errors.firstName && (
+              <span className="error" role="alert">
+                {errors.firstName.message}
+              </span>
+            )}
+          </div>
+          <div className="field">
+            <label htmlFor="lastName">Nom</label>
+            <input id="lastName" {...register('lastName')} aria-invalid={!!errors.lastName} />
+            {errors.lastName && (
+              <span className="error" role="alert">
+                {errors.lastName.message}
+              </span>
+            )}
+          </div>
+          <div className="field">
+            <label htmlFor="avs">AVS</label>
+            <input
+              id="avs"
+              placeholder="756.1234.5678.97"
+              {...register('avs')}
+              aria-invalid={!!errors.avs}
+            />
+            {errors.avs && (
+              <span className="error" role="alert">
+                {errors.avs.message}
+              </span>
+            )}
+          </div>
+          <div className="field">
+            <label htmlFor="iban">IBAN</label>
+            <input
+              id="iban"
+              placeholder="CH93 0076 2011 6238 5295 7"
+              {...register('iban')}
+              aria-invalid={!!errors.iban}
+            />
+            {errors.iban && (
+              <span className="error" role="alert">
+                {errors.iban.message}
+              </span>
+            )}
+          </div>
+          <div className="field">
+            <label htmlFor="residenceCanton">Canton de résidence</label>
+            <select id="residenceCanton" {...register('residenceCanton')}>
+              {CANTONS.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="email">Email (optionnel)</label>
+            <input id="email" type="email" {...register('email')} />
+            {errors.email && (
+              <span className="error" role="alert">
+                {errors.email.message}
+              </span>
+            )}
+          </div>
+          <div className="field">
+            <label htmlFor="phone">Téléphone (optionnel)</label>
+            <input id="phone" placeholder="+41 78 000 00 00" {...register('phone')} />
+          </div>
+          {submitError !== undefined && (
+            <p className="error" role="alert" style={{ marginBottom: 12 }}>
+              {submitError}
+            </p>
+          )}
+          <button
+            type="submit"
+            className="btn accent"
+            disabled={isSubmitting}
+            style={{ marginTop: 8 }}
+          >
+            {isSubmitting ? 'Enregistrement…' : 'Créer'}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }
