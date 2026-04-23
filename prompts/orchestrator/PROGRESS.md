@@ -1,6 +1,6 @@
 # PROGRESS.md — État d'avancement du projet
 
-> **Dernière mise à jour** : 2026-04-23 11:00 — **A6.5 fermé** (PR #74, commit `ea52d41`) + DETTE-036 ouverte (PR #73, A5.2 divergence). **44/48 prompts catalogue** + 2 PRs ad-hoc. **1105 unit + 6 integration tests** sur 8 workspaces. RPO ≤ 6 min et RTO ≤ 4h DR démontrés en local. Reste : A6.6 pentest + A6.7 go-live (externes).
+> **Dernière mise à jour** : 2026-04-23 13:00 — **DETTE-036 fermée** (PR #77, commit `03554c3`) : table Prisma `canton_holidays` + 26 cantons (vs 11) + règle "plus favorable" CCT/contrat + Tessin ajouté. **44/48 prompts catalogue** + 2 PRs ad-hoc. **1167 unit + 53 integration tests** sur 8 workspaces (+62 unit, +6 integration). Coverage domain payroll **98.86%** (>= 90% DoD). Reste : A6.6 pentest + A6.7 go-live (externes).
 > **Source de vérité** pour l'orchestrateur. **Ne jamais** le mettre à jour à la main sans avoir suivi le protocole `ORCHESTRATOR.md`.
 
 ---
@@ -12,9 +12,10 @@
 - **Prochain prompt** : aucun prompt code-only catalogue restant. Pistes : DETTE-033 (worker /metrics) + DETTE-035 (métriques business) en 1 PR cohérente — débloque les dashboards Grafana actuellement à moitié vides. Voir SESSION-LOG du 2026-04-23 10:00 pour analyse détaillée.
 - **Prompts complétés** : 44 / 48 catalogue (91.7%) + 2 ad-hoc (design + dev fix) + 0 / 5 OPS
 - **Blockers ouverts** : 2 (BLOCKER-001 sandbox MP, BLOCKER-002 autorisation LSE — externes, non-dev)
-- **Dette technique** : 10 ouvertes / 23 fermées (006/008/014/015/016 + 3 A6.3 + 1 A5.2 + 1 A6.5)
-- **Tests** : **1105 unit + 6 integration** sur 8 workspaces (vs 1095 avant ; +10 tests A6.5)
-- **Vélocité observée** : 44 prompts en 39 heures (sprint marathon 2026-04-21 → 2026-04-23 11:00)
+- **Dette technique** : 12 ouvertes / 24 fermées (006/008/014/015/016 + 3 A6.3 + 1 A6.5 + 3 DETTE-036 sub-tickets — DETTE-036 originale **CLOSE**)
+- **Tests** : **1167 unit + 53 integration** sur 8 workspaces (vs 1105/47 ; +62 unit, +6 integration)
+- **Coverage domain payroll** : **98.86% lines** / 87.5% branches / 98.21% functions (DoD ≥ 90% atteint)
+- **Vélocité observée** : 44 prompts catalogue + 2 ad-hoc + 3 DETTE résolues en 41 heures (sprint marathon 2026-04-21 → 2026-04-23 13:00)
 - **Skills disponibles** : 32 (voir `skills/README.md`)
 - **Documents de référence** : 13 (brief, spec, plan, archi, risques, rôles, registre nLPD, pr-template, ADR-0001/0002/0003, dev-setup, firebase-setup, github-branch-protection, runbooks ×6)
 
@@ -85,7 +86,7 @@
 | Prompt | Complété le | PR | Commit | Notes |
 |--------|-------------|----|----|-------|
 | `A5.1-payroll-engine-cct` | 2026-04-22 | [#58](https://github.com/kreuille/interim-agency-system/pull/58) | `a7cbe22` | Moteur de paie hebdo pur domain — CCT × heures × majo |
-| `A5.2-payroll-majorations` ⚠️ | 2026-04-22 | (inclus dans #58) | `a7cbe22` | `surcharge-rules.ts` + `canton-holidays.ts` bundlés avec A5.1. **Divergence** : DETTE-036 — port TS `StaticCantonHolidaysPort` (11 cantons : GE/VD/FR/NE/JU/BE/ZH/BS/BL/AG/VS) au lieu de table Prisma `canton_holidays` seedée. TI manquant. Règle "plus favorable" contrat>CCT non implémentée. Esprit du prompt satisfait (majorations correctement appliquées dans payroll-engine), lettre non. |
+| `A5.2-payroll-majorations` ✅ | 2026-04-22 + 2026-04-23 | (inclus dans #58) + [#77](https://github.com/kreuille/interim-agency-system/pull/77) | `a7cbe22` + `03554c3` | `surcharge-rules.ts` + `canton-holidays.ts` bundlés avec A5.1 (PR #58). DETTE-036 **fermée** via PR #77 : table Prisma `canton_holidays` versionnée (validFrom/validTo) + couverture 26 cantons (vs 11, ajout Tessin et autres) + 947 rows seedées 2026-2028 + audit log + règle "plus favorable" `applyContractOverrides()` (contrat > CCT) + 9 integration tests Testcontainers + coverage payroll 98.86%. |
 | `A5.3-payroll-retenues-sociales` | 2026-04-22 | [#59](https://github.com/kreuille/interim-agency-system/pull/59) | `c158443` | AVS/AC/LAA/LPP + IS cantonal + arrondi 5cts NET |
 | `A5.4-payslip-pdf-standard-ch` | 2026-04-22 | [#60](https://github.com/kreuille/interim-agency-system/pull/60) | `257258e` | Bulletin de paie PDF déterministe |
 | `A5.6-iso20022-pain001-export` | 2026-04-22 | [#61](https://github.com/kreuille/interim-agency-system/pull/61) | `ad239e4` | Export ISO 20022 pain.001.001.09 CH |
@@ -131,10 +132,12 @@
 
 | Ordre | Prompt | Sprint | Effort | Notes |
 |-------|--------|--------|--------|-------|
-| 1 | **`DETTE-033 + DETTE-035` (1 PR combinée)** | A.6 | S+S | **Prochain travail prêt à lancer** — wire `/metrics` endpoint sur `apps/worker/main.ts` (port 9090) avec counters BullMQ + métriques business `payroll_batch_*` / `availability_outbox_*`. Débloque immédiatement les 4 dashboards Grafana actuellement à moitié vides (`queue-depth`, `mp-health`, `payroll-batch`, `backup-dr`) |
-| 2 | `DETTE-036` (A5.2 divergence) | A.6 | M | (a) ADR formelle pour entériner port TS `StaticCantonHolidaysPort` OU migration vers table Prisma + seed 2026-2028 ; (b) ajouter Tessin (TI) ; (c) règle "plus favorable" contrat>CCT |
+| 1 | **`DETTE-033 + DETTE-035` (1 PR combinée)** | A.6 | S+S | **Prochain travail prêt à lancer** — wire `/metrics` endpoint sur `apps/worker/main.ts` (port 9090) avec counters BullMQ + métriques business `payroll_batch_*` / `availability_outbox_*` / `pg_dump_*` / `wal_archive_*` / `dr_restore_*`. Débloque immédiatement les 4 dashboards Grafana actuellement à moitié vides (`queue-depth`, `mp-health`, `payroll-batch`, `backup-dr`) |
+| 2 | `DETTE-038` (wire preload canton-holidays bootstrap) | A.7 | XS | Appeler `PrismaCantonHolidayRepository.preload()` au bootstrap API pour année courante + N+1. Sans ça, le cache reste vide en runtime → fallback silencieux sur `StaticCantonHolidaysPort` |
 | 3 | `DETTE-037` (job CI test-roundtrip mensuel) | A.6 | M | Job GitHub Actions qui exécute `ops/backup/test-roundtrip.sh` dans compose `dr-test`. Évite régression silencieuse sur scripts shell DR |
 | 4 | `DETTE-034` (oncall-sms-bridge) | A.7 | M | Passerelle webhook → Swisscom SMS API pour Alertmanager receiver `on-call`. Sinon les alertes P1 vont seulement dans Slack |
+| 5 | `DETTE-039` (Jeûne genevois `sunday_relative`) | A.7 | XS | Raffiner le placeholder `fixed 9/1` GE → `sunday_relative {ordinal:1, offset:4}` (jeudi après 1er dim sept) |
+| 6 | `DETTE-036(a) bis` (ADR canton_holidays double mécanisme) | A.7 | S | ADR formelle pour entériner le double mécanisme port TS fallback + table Prisma source de vérité, OU supprimer `StaticCantonHolidaysPort` après wiring complet |
 
 ### 🔵 Pending — OPS transversal (5 prompts catalogués)
 
@@ -218,6 +221,10 @@ Décisions prises et non renégociables sans ADR. Mettre à jour au fil de l'eau
 | 2026-04-23 | DR cible base : suffixe `_dr`/`_test_`/`interim_dev` obligatoire ; guard `pg_restore.sh` refuse drop sinon (anti-fat-finger anti-prod) | `ops/backup/pg_restore.sh` § guard | A6.5 (PR #74) |
 | 2026-04-23 | DR rétention : 90 jours dumps quotidiens (politique nLPD : pas plus que nécessaire), 30 jours WAL pour PITR | `ops/backup/README.md` § Lifecycle | A6.5 (PR #74) |
 | 2026-04-23 | DR test mensuel : worker BullMQ cron `0 3 1 * *` Europe/Zurich, RTO budget 14400s (4h), métrique `dr_restore_duration_seconds` | `apps/worker/src/dr-restore-test.worker.ts` | A6.5 (PR #74) |
+| 2026-04-23 | Référentiel fériés cantonaux : 26 cantons (ISO 3166-2:CH) avec 3 types de def discriminés (`fixed`/`easter_relative`/`sunday_relative`). Fériés fédéraux 7, fériés cantonaux variables (TI = 9 spécificités catholiques) | `packages/domain/src/payroll/canton-holidays-data.ts` | DETTE-036 (PR #77) |
+| 2026-04-23 | Table Prisma `canton_holidays` : pas d'`agencyId` (référentiel public commun), PK composite `(canton, date, validFrom)` pour versioning historique 10 ans | `apps/api/prisma/schema.prisma` | DETTE-036 (PR #77) |
+| 2026-04-23 | `CantonHolidayPort.forCantonAndYear` SYNCHRONE par contrat (consommé par `PayrollEngine` pur). Adapter Prisma offre `preload(canton, year)` async à appeler au bootstrap + cache in-memory invalidé après `upsertMany` | `apps/api/src/infrastructure/persistence/prisma/canton-holiday.repository.ts` | DETTE-036 (PR #77) |
+| 2026-04-23 | Règle "plus favorable" CCT/contrat : `applyContractOverrides()` retient `Math.max(CCT, contrat)` pour night/sunday/holiday/overtime. CCT = plancher légal infranchissable (override `<` ignoré silencieusement). `stackSundayAndNight` et `overtimeThresholdMinutes` non overridables (CCT-branche) | `packages/domain/src/payroll/surcharge-rules.ts` | DETTE-036 (PR #77) |
 
 ---
 
@@ -251,7 +258,7 @@ Décisions prises et non renégociables sans ADR. Mettre à jour au fil de l'eau
 
 ## 5. Dettes techniques qualifiées
 
-### Dettes ouvertes (10)
+### Dettes ouvertes (12)
 
 | ID | Ouverte le | Description | Priorité | ETA |
 |----|------------|-------------|----------|-----|
@@ -263,8 +270,11 @@ Décisions prises et non renégociables sans ADR. Mettre à jour au fil de l'eau
 | DETTE-033 | 2026-04-23 | Wire `/metrics` endpoint sur `apps/worker/main.ts` (port 9090) avec counters BullMQ par queue. Sans ça, dashboards `queue-depth`, `mp-health` (outbox lag), `payroll-batch`, `backup-dr` restent vides | M | A.6 (court — S) |
 | DETTE-034 | 2026-04-23 | Implémenter `oncall-sms-bridge` (passerelle webhook → Swisscom SMS API) ou wire un service tiers (PagerDuty, Opsgenie). Sinon receiver `on-call` Alertmanager n'envoie qu'à Slack | M | A.7 |
 | DETTE-035 | 2026-04-23 | Exposer métriques business `payroll_batch_*`, `availability_outbox_*`, `pg_dump_*`, `wal_archive_*`, `dr_restore_*` référencées par les dashboards/alertes | S | A.6 (court — S, à fusionner avec DETTE-033) |
-| DETTE-036 | 2026-04-23 | A5.2 divergence : (a) ADR formelle pour entériner port TS `StaticCantonHolidaysPort` au lieu de table Prisma `canton_holidays` seedée OU migration vers table Prisma + seed 2026-2028 ; (b) ajouter Tessin (TI) dans `CANTONAL_FIXED` ; (c) implémenter règle "plus favorable" contrat client > CCT | M | A.6 ou ADR rapide |
+| ~~DETTE-036~~ | ~~2026-04-23~~ | ~~A5.2 divergence : (a) port TS vs table Prisma ; (b) Tessin manquant ; (c) règle "plus favorable"~~ — **CLOSE 2026-04-23 13:00 via PR #77** : table Prisma versionnée + 26 cantons (Tessin inclus) + `applyContractOverrides()` + 947 rows seedées + 9 integration tests + coverage 98.86% | ~~M~~ | ✅ |
+| DETTE-036(a) bis | 2026-04-23 | ADR formelle pour entériner double mécanisme (port TS fallback + table Prisma source de vérité) OU supprimer `StaticCantonHolidaysPort` après wiring complet | S | A.7 |
 | DETTE-037 | 2026-04-23 | Job CI mensuel qui exécute `ops/backup/test-roundtrip.sh` dans GitHub Actions (compose `dr-test` + age + bash). Sinon le test E2E ne tourne qu'en local — risque de régression silencieuse sur scripts shell | M | A.6 (avant pilote) |
+| DETTE-038 | 2026-04-23 | Wire `PrismaCantonHolidayRepository.preload()` au bootstrap de l'API pour les cantons + années actifs (typiquement année courante + N+1). Sans ça, le cache reste vide en runtime → fallback silencieux sur `StaticCantonHolidaysPort` requis | XS | A.7 (avec wiring `RunPayrollWeekUseCase`) |
+| DETTE-039 | 2026-04-23 | Le Jeûne genevois exact (jeudi après 1er dim sept) est codé en dur comme `fixed 9/1` placeholder dans GE — à raffiner via `sunday_relative {ordinal:1, offset:4}` | XS | A.7 |
 
 ### Dettes fermées (23)
 
@@ -282,14 +292,14 @@ DETTE-001 (composite TS, reportée A.6) · DETTE-002 (repo GitHub) · DETTE-003 
 |----------|--------|-------|----------|
 | Prompts completed catalogue | 44 / 48 (91.7%) | 100% (S14) | 🟢 en avance |
 | Prompts completed total (catalogue + ad-hoc + OPS) | 46 / 53 | 53 | 🟢 |
-| Tests unit + integration | **1105 unit + 6 integration** | ≥ couverture seuils | 🟢 |
+| Tests unit + integration | **1167 unit + 53 integration** | ≥ couverture seuils | 🟢 |
 | Couverture domain | 100% (mesurée A1.1) | ≥ 85% | 🟢 |
 | Couverture shared | 96.58% | ≥ 80% | 🟢 |
 | Couverture application | 84.14% | ≥ 80% | 🟢 |
 | Couverture api | 87.24% lines / 75.24% branches | ≥ 80%/70% | 🟢 |
 | Blockers conformité ouverts | 1 (LSE — externe) | 0 avant go-live | 🟡 |
 | Blockers techniques ouverts | 1 (sandbox MP — externe) | 0 avant go-live | 🟡 |
-| Dettes techniques qualifiées | 10 ouvertes (5 externes + 3 A6.3 + 1 A5.2 + 1 A6.5 court terme) / 23 fermées | < 10 ouvertes | 🟡 (cible atteinte tout juste) |
+| Dettes techniques qualifiées | 12 ouvertes (5 externes + 3 A6.3 + 1 A6.5 + 3 DETTE-036 sub-tickets) / 24 fermées | < 10 ouvertes | 🔴 (DETTE-036 originale fermée mais 3 sub-tickets ouverts) |
 | PR avec revue humaine | 100% (toutes les 50+ PRs mergées via gh admin merge) | 100% | 🟢 |
 | Vélocité observée (prompts/jour) | ~14 (sprint marathon 36h) | 4–6 régime de croisière | 🟢 |
 | Incidents staging / sem | n/a (pas encore staging) | < 2 | — |
@@ -313,7 +323,7 @@ DETTE-001 (composite TS, reportée A.6) · DETTE-002 (repo GitHub) · DETTE-003 
 
 | Semaine | Prompts completed | Vélocité | Blockers ajoutés/clos | Notes |
 |---------|-------------------|----------|----------------------|-------|
-| 2026-W17 (en cours) | 44 catalogue + 2 ad-hoc | exceptionnelle (sprint marathon) | 0 ajoutés / 2 clos (B-003, B-004 décision) | Resynchro PROGRESS 2026-04-23 09:00 ; A6.3 fermé 09:30 ; A5.2 divergence (DETTE-036) 10:00 ; A6.5 fermé 11:00 (RPO/RTO démontrés) |
+| 2026-W17 (en cours) | 44 catalogue + 2 ad-hoc + 3 DETTE résolues | exceptionnelle (sprint marathon) | 0 ajoutés / 2 clos (B-003, B-004 décision) | Resynchro PROGRESS 2026-04-23 09:00 ; A6.3 fermé 09:30 ; A5.2 divergence (DETTE-036 ouverte) 10:00 ; A6.5 fermé 11:00 ; DETTE-036 fermée 13:00 (Prisma + 26 cantons + plus favorable, +62 tests) |
 
 ---
 
