@@ -1,0 +1,199 @@
+name: DR Roundtrip Test
+
+# Workflow CI dédié au test E2E backup/restore (DETTE-037).
+#
+# Triggers :
+#   - schedule  : 1er du mois à 03h00 UTC (= 04h-05h Europe/Zurich, hors
+#                 heures ouvrées + hors batch paie hebdo). Match le cron
+#                 du worker `dr-restore-test.worker.ts`.
+#   - workflow_dispatch : déclenchement manuel pour gameday ou debug.
+#   - pull_request paths-filter : si une PR touche `ops/backup/*` ou ce
+#                 workflow, on revalide pour éviter qu'un changement
+#                 silencieux casse les scripts shell sans qu'on le voie
+#                 attendre 1 mois.
+#
+# Garde-fou : timeout 30 min (le test local prend < 5 min ; un test CI
+# qui dépasse 30 min trahit un blocage docker/network — fail-fast).
+#
+# Voir : `ops/backup/test-roundtrip.sh`, `docs/runbooks/disaster-recovery.md`,
+# `prompts/orchestrator/SESSION-LOG.md` § DETTE-037.
+
+on:
+  schedule:
+    - cron: '0 3 1 * *' # 1er du mois 03h00 UTC
+  workflow_dispatch:
+    inputs:
+      rto_budget_seconds:
+        description: 'RTO budget en secondes (default 14400 = 4h)'
+        required: false
+        default: '14400'
+      seed_rows_per_table:
+        description: 'Nombre de rows seedées par table critique (test charge minimale)'
+        required: false
+        default: '500'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'ops/backup/**'
+      - 'ops/docker-compose.dr-test.yml'
+      - 'docker-compose.yml'
+      - '.github/workflows/dr-roundtrip.yml'
+
+concurrency:
+  group: dr-roundtrip-${{ github.ref }}
+  cancel-in-progress: false # ne pas annuler un test mensuel en cours si push concurrent
+
+permissions:
+  contents: read
+
+jobs:
+  dr-roundtrip:
+    name: DR roundtrip E2E (dump → restore → verify)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install age (encryption)
+        run: |
+          set -euo pipefail
+          # age est dans les repos Ubuntu 24.04 — pas besoin de PPA
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends age
+          age --version
+
+      - name: Install postgresql-client (pg_dump + pg_restore + psql)
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y --no-install-recommends postgresql-client-16 || \
+            sudo apt-get install -y --no-install-recommends postgresql-client
+          pg_dump --version
+          psql --version
+
+      - name: Generate ephemeral age keypair
+        # CRITIQUE : ces clés sont JETABLES — elles n'existent que pour
+        # ce job CI. Elles ne sont jamais exportées, jamais committées,
+        # jamais utilisées en prod. Le job nettoie le dossier `test-keys/`
+        # à la fin (le runner GitHub est de toute façon éphémère).
+        run: |
+          set -euo pipefail
+          mkdir -p ops/backup/test-keys
+          age-keygen -o ops/backup/test-keys/identity.txt 2>/dev/null
+          grep '^# public key:' ops/backup/test-keys/identity.txt | cut -d' ' -f4 \
+            > ops/backup/test-keys/recipient.txt
+          echo "::group::age recipient (public key, safe to log)"
+          cat ops/backup/test-keys/recipient.txt
+          echo "::endgroup::"
+
+      - name: Start Postgres source + DR (docker compose)
+        run: |
+          set -euo pipefail
+          docker compose -f docker-compose.yml -f ops/docker-compose.dr-test.yml \
+            up -d postgres postgres-dr
+
+      - name: Wait for Postgres healthy (source + dr)
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 30); do
+            src=$(docker inspect --format='{{.State.Health.Status}}' interim-postgres 2>/dev/null || echo unknown)
+            dr=$(docker inspect --format='{{.State.Health.Status}}' interim-postgres-dr 2>/dev/null || echo unknown)
+            echo "[wait] postgres=${src} postgres-dr=${dr}"
+            if [ "${src}" = "healthy" ] && [ "${dr}" = "healthy" ]; then
+              echo "Both Postgres healthy after ${i} attempts"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::Postgres containers not healthy after 60s" >&2
+          docker compose -f docker-compose.yml -f ops/docker-compose.dr-test.yml ps
+          docker compose -f docker-compose.yml -f ops/docker-compose.dr-test.yml logs --tail=50 postgres postgres-dr
+          exit 1
+
+      - name: Seed source DB with realistic rowcounts
+        # Reproduit le seed local du test E2E : 4 tables critiques avec
+        # volumes représentatifs. Si on change le seed local, mettre à
+        # jour ici aussi (DETTE future : factoriser dans ops/backup/seed-test.sql).
+        env:
+          SEED_ROWS: ${{ github.event.inputs.seed_rows_per_table || '500' }}
+        run: |
+          set -euo pipefail
+          docker exec -i interim-postgres psql -U dev -d interim_dev <<SQL
+          CREATE TABLE IF NOT EXISTS temp_workers (id serial primary key, name text);
+          CREATE TABLE IF NOT EXISTS mission_proposals (id serial primary key, status text);
+          CREATE TABLE IF NOT EXISTS timesheets (id serial primary key, hours int);
+          CREATE TABLE IF NOT EXISTS audit_logs (id serial primary key, event text);
+          INSERT INTO temp_workers (name)
+            SELECT 'worker_' || g FROM generate_series(1, ${SEED_ROWS}) g;
+          INSERT INTO mission_proposals (status)
+            SELECT (ARRAY['proposed','accepted','refused'])[1+g%3]
+            FROM generate_series(1, ${SEED_ROWS}) g;
+          INSERT INTO timesheets (hours)
+            SELECT 40 + g % 10 FROM generate_series(1, ${SEED_ROWS}) g;
+          INSERT INTO audit_logs (event)
+            SELECT 'event_' || g FROM generate_series(1, ${SEED_ROWS}) g;
+          SQL
+          # Vérification : 4 × SEED_ROWS rows attendues
+          docker exec -i interim-postgres psql -U dev -d interim_dev -c \
+            "SELECT 'temp_workers' AS t, count(*) FROM temp_workers
+             UNION ALL SELECT 'mission_proposals', count(*) FROM mission_proposals
+             UNION ALL SELECT 'timesheets', count(*) FROM timesheets
+             UNION ALL SELECT 'audit_logs', count(*) FROM audit_logs;"
+
+      - name: Run test-roundtrip.sh (E2E dump → restore → verify)
+        env:
+          AGE_RECIPIENT_FILE: ops/backup/test-keys/recipient.txt
+          AGE_IDENTITY_FILE: ops/backup/test-keys/identity.txt
+          PG_SRC_HOST: localhost
+          PG_DR_HOST: localhost
+          PG_SRC_PORT: '5432'
+          PG_DR_PORT: '5433'
+          RTO_BUDGET_SECONDS: ${{ github.event.inputs.rto_budget_seconds || '14400' }}
+        run: |
+          set -euo pipefail
+          AGE_RECIPIENT="$(cat "${AGE_RECIPIENT_FILE}")"
+          export AGE_RECIPIENT
+          chmod +x ops/backup/*.sh
+          bash ops/backup/test-roundtrip.sh
+
+      - name: Capture roundtrip event JSON for downstream metrics
+        if: always()
+        run: |
+          set -euo pipefail
+          # On re-extrait le dernier event JSON (déjà loggé pendant
+          # l'étape précédente, mais on le sépare ici pour qu'il soit
+          # facilement parsable par d'autres jobs / artifacts).
+          # Ce step ne fait rien si la stack a déjà été cleanup.
+          if docker exec -i interim-postgres pg_isready -U dev >/dev/null 2>&1; then
+            docker exec -i interim-postgres psql -U dev -d interim_dev -c \
+              "SELECT count(*) AS rows_after_roundtrip FROM temp_workers;" || true
+          fi
+
+      - name: Upload diagnostic logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dr-roundtrip-failure-${{ github.run_id }}
+          path: |
+            ops/backup/test-keys/recipient.txt
+          retention-days: 7
+          # On n'upload PAS la clé privée (`identity.txt`) — même éphémère,
+          # garde-fou contre un mauvais usage en cas de fork malveillant.
+
+      - name: Dump container logs on failure
+        if: failure()
+        run: |
+          echo "=== postgres logs ==="
+          docker logs interim-postgres --tail 100 2>&1 || true
+          echo "=== postgres-dr logs ==="
+          docker logs interim-postgres-dr --tail 100 2>&1 || true
+          echo "=== docker compose ps ==="
+          docker compose -f docker-compose.yml -f ops/docker-compose.dr-test.yml ps || true
+
+      - name: Cleanup containers + ephemeral keys
+        if: always()
+        run: |
+          set +e
+          docker compose -f docker-compose.yml -f ops/docker-compose.dr-test.yml down -v
+          rm -rf ops/backup/test-keys
+          echo "[cleanup] containers stopped, ephemeral keys removed"
