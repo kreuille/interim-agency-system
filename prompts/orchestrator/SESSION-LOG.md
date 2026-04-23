@@ -5,6 +5,80 @@
 
 ---
 
+## Session 2026-04-23 06:30 — Resynchronisation PROGRESS.md (sprint marathon A1.2 → A6.4 + 2 ad-hoc)
+
+- **Opérateur** : Claude Code (Sonnet 4.5) — déclencheur : user "Avant toute chose : resynchronise PROGRESS.md avec l'état réel du repo"
+- **Branche** : `main` (pas de feature branch — c'est un audit/recalibrage, pas du code)
+- **Objectif** : combler la dérive entre `PROGRESS.md` (figé à 5/53 prompts au 2026-04-22 07:35) et l'état réel du repo (42/48 catalogue mergés + 2 ad-hoc).
+
+### Méthode (audit en 5 passes)
+
+1. **Lecture protocole** : `CLAUDE.md` + `ORCHESTRATOR.md` rechargés en intégralité.
+2. **Inventaire git** :
+   - `git log --oneline -100` → 66 commits sur `main` depuis bootstrap
+   - `gh pr list --state merged --limit 100 --json` → **52 PRs mergées** entre 2026-04-21 17:49 et 2026-04-23 05:02
+3. **Croisement prompt ↔ PR ↔ commit** par nom de branche `feat/AX.Y-titre` :
+   - Sprint A.0 : 5/6 (A0.4 externe — provisioning GCP)
+   - Sprint A.1 : **7/7 ✅**
+   - Sprint A.2 : **6/6 ✅**
+   - Sprint A.3 : **6/6 ✅**
+   - Sprint A.4 : **7/7 ✅**
+   - Sprint A.5 : 8/9 (A5.5 externe — sandbox Swissdec ; A5.2 bundlé dans A5.1 commit `a7cbe22`)
+   - Sprint A.6 : 3.5/7 (A6.1+A6.2+A6.4 ✅, A6.3 partiel code-only, A6.5/A6.6/A6.7 externes)
+   - Ad-hoc : 2 (PR #68 design Helvètia, PR #69 fix dev server)
+4. **Vérification physique du code** quand le commit message ne suffisait pas :
+   - `packages/domain/src/payroll/surcharge-rules.ts` + `canton-holidays.ts` confirment A5.2 inclus dans A5.1
+   - `apps/api/src/infrastructure/observability/{metrics,tracing,sentry}.ts` confirment le code A6.3 posé via PR #48 (DETTE-026/027)
+   - `docs/runbooks/{database-down,mp-unreachable,payment-file-rejected,payroll-batch-failed,secret-leaked,webhook-storm}.md` confirment A6.4 ✅
+5. **Suite de tests complète** : `pnpm -r --if-present test` → **1081 unit + 6 integration** verts sur 8 workspaces (vs 206 dans le dernier PROGRESS).
+   - shared: 67 tests (10 files)
+   - mock-moveplanner: 8 tests (1 file)
+   - domain: 451 tests (37 files)
+   - web-portal: 16 tests (3 files)
+   - application: 266 tests (43 files)
+   - web-admin: 45 tests (6 files)
+   - worker: 7 tests (2 files)
+   - api: 221 tests (26 files)
+
+### Décisions de remise au propre du working tree
+
+| Élément | Décision | Justification |
+|---------|----------|---------------|
+| `stash@{0}` (`next-env.d.ts` autogen) | **drop** | 3 lignes auto-générées par Next dev runtime à chaque démarrage. Sans valeur, sera regénéré au besoin. |
+| `.design-tmp/` (bundle design Helvètia extrait via tar) | **gitignore** (`.gitignore` mis à jour) | Artefact one-shot déjà utilisé pour produire PR #68 (mergée). Garder localement comme référence mais ne pas committer. |
+
+### Livrables
+
+- `prompts/orchestrator/PROGRESS.md` — réécriture complète (état réel)
+- `prompts/orchestrator/SESSION-LOG.md` — cette entrée
+- `.gitignore` — ajout `.design-tmp/`
+
+### Métriques
+
+- **Prompts catalogue** : 42/48 (87.5%) mergés en 36h (sprint marathon 2026-04-21 17:49 → 2026-04-23 05:02)
+- **PRs ad-hoc** : 2 (design + fix dev)
+- **Dettes** : 5 ouvertes (toutes externes ou A.6 ops) / 23 fermées
+- **Blockers** : 2 (LSE auth, sandbox MP — toujours externes)
+- **Vélocité** : ~14 prompts/jour observée sur 36h continues
+
+### Prochain prompt suggéré
+
+**`A6.3-observability-stack` — clôture ops infra (M, ~1 jour)**
+
+Justification (per ORCHESTRATOR §5) :
+1. **Chemin critique** : sprint A.6 en cours, A6.3 partiellement fait — clore la boucle est plus court qu'attaquer A6.5
+2. **Déblocage** : A6.3 complet débloque A6.6 (pentest a besoin des dashboards de monitoring) et A6.7 (go-live exige Alertmanager actif)
+3. **Code only** : aucune dépendance externe (les YAML/JSON Grafana + Loki + Alertmanager sont des fichiers dans le repo, validables via docker-compose local)
+4. **Taille** : M (1 jour), tient dans une session sans risque de saturation
+
+**Alternatives proposées** :
+- **`A6.5-backup-restore-dr-test` (M)** : préparation locale faisable (scripts pg_dump + restore + runbook DR avec docker-compose Postgres). Activation prod attend DETTE-015 (provisioning GCP).
+- **Continuer le design Helvètia** (ad-hoc `AH.003`) : appliquer le design system aux écrans non-couverts (availabilities calendar, payroll, invoicing, seco-export, compliance dashboard) — plus visible côté UX mais moins critique pour le go-live.
+
+À défaut d'instruction, l'orchestrateur suggère **A6.3** comme prochain prompt.
+
+---
+
 ## Session 2026-04-22 07:35 — Dettes 001/003/004/005/009/011/012 fermées en chaîne
 
 - **Opérateur** : Claude Code (Opus 4.7) — déclencheur : user "continue et resoud les dettes automatiquement"

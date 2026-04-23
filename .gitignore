@@ -22,3 +22,7 @@ Thumbs.db
 
 .turbo
 .cache
+
+# Design bundles téléchargés depuis Claude Design (utilisés en lecture pour
+# produire les PR de design ; jamais committés tels quels).
+.design-tmp/
