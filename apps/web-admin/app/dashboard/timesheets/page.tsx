@@ -45,14 +45,34 @@ export default async function TimesheetsPage(): Promise<React.JSX.Element> {
   const toReview = timesheets.filter((t) => t.state === 'received' || t.state === 'under_review');
 
   return (
-    <div className="card">
-      <div className="toolbar">
-        <h1>Timesheets à contrôler</h1>
-        <span className="me">
-          {toReview.length} à contrôler / {timesheets.length} total
-        </span>
+    <div style={{ padding: 20 }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 12,
+        }}
+      >
+        <div>
+          <div className="label">Contrôle hebdomadaire</div>
+          <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 2 }}>
+            {toReview.length} à contrôler · {timesheets.length} relevé(s) au total
+          </div>
+        </div>
+        {toReview.length > 0 ? (
+          <span className="chip warn">
+            <span className="dot" />
+            {toReview.length} à contrôler
+          </span>
+        ) : (
+          <span className="chip ok">
+            <span className="dot" />
+            Tous signés
+          </span>
+        )}
       </div>
-      <p style={{ fontSize: '0.875rem', color: '#666', marginBottom: 12 }}>
+      <p style={{ fontSize: 11.5, color: 'var(--ink-3)', marginBottom: 12 }}>
         Comparaison horaires planifiés / réels avec anomalies LTr/CCT surlignées. Cliquez sur
         l&apos;anomalie pour voir la référence légale. Bloquant (rouge) → ne peut pas être signé,
         doit être corrigé ou contesté.
