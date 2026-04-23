@@ -5,6 +5,108 @@
 
 ---
 
+## Session 2026-04-23 20:00 — Wiring DI minimal (→ DETTE-042 pour reste) + Phase 2 GCP preview live
+
+- **Opérateur** : Claude Code (Sonnet 4.5) — déclencheur : user "je cherche la version prod live pour tester" → session orientée déploiement preview rapide après négociation scope.
+- **Sprint** : hors sprint (opportuniste, post A.6 STOP code-only).
+- **Branches Git** : `feat/dette-014-wiring-di-preview` (PR #84 mergée `a18c6b9`), `feat/phase2-gcp-preview-infra` (PR #85 mergée `5eb2963`).
+- **Skills chargées** : aucune spécifique — session de déploiement, pas de design métier.
+- **Contexte** : on était "STOP code-only". User a demandé une preview live pour cliquer/tester. Audit de `main.ts` a révélé que `createApp()` était appelé sans deps → toutes les routes `/api/v1/*` retournaient 404 (le bloc `if (deps)` dans `app.ts` L159 était skippé). Donc impossible de faire une preview fonctionnelle sans d'abord câbler le DI.
+- **Négociation scope** : proposé 3 options (preview backend-only, preview fonctionnelle avec wiring DI + rest later, STOP attendre A0.4 propre). User a choisi fast path "wiring DI minimal + GCP preview, région peu importe".
+
+### Déroulé Phase 1 — wiring DI minimal (PR #84 `a18c6b9`)
+
+1. **Audit use cases** : Explore agent a produit le blueprint DI (constructor sigs + Prisma repo impls + ports). Tous les use cases workers/documents/availability ont des repos Prisma existants + impls in-memory pour les side-effects (ObjectStorage, ScanQueue, DocumentAuditLogger, AvailabilityEventPublisher) déjà exportées depuis `@interim/application` via test-helpers.
+
+2. **Nouveau `DevTokenVerifier`** (`apps/api/src/infrastructure/auth/dev-token-verifier.ts`, 72 lignes) : accepte n'importe quel Bearer token, retourne `agency_admin` sur la 1ère agence trouvée en DB. Cache après premier appel. `agencyId` surchargeable via `DEV_AGENCY_ID`. WARN log au boot quand activé.
+
+3. **Réécriture `main.ts`** avec composition DI complète :
+   - `buildTokenVerifier()` dispatch selon `AUTH_MODE` (dev | firebase, default firebase avec fail-fast sur absence de `FIREBASE_PROJECT_ID`)
+   - `buildDeps()` instancie PrismaClient + SystemClock + randomUUID, crée les 3 Prisma repos (Worker, Document, Availability), PrismaAuditLogger (workers) + impls in-memory (documents + availability).
+   - Câble 13 use cases : 5 workers, 5 documents, 3 availability.
+
+4. **Validation locale** : `docker compose up postgres` + `prisma migrate deploy` + `prisma:seed` + `AUTH_MODE=dev PORT=4100 tsx src/main.ts`. Tests curl end-to-end : `/health` OK, `/api/v1/workers` sans token = 401, avec Bearer = liste seeded (Jean Dupont + Marie Martin), GET by id OK, POST create avec Idempotency-Key → `{workerId}`, GET availability/week OK.
+
+5. **Fix CI "Build API Docker image"** : le smoke test lançait le container avec seulement `NODE_ENV=production`. Depuis le wiring, le boot exige `AUTH_MODE` (défaut firebase → throw si `FIREBASE_PROJECT_ID` absent). Fix : passer `AUTH_MODE=dev` + `DATABASE_URL` factice. PrismaClient connect en lazy, `/health` ne touche pas la DB.
+
+### Déroulé Phase 2 — GCP preview live (PR #85 `5eb2963`)
+
+1. **Quota projets GCP** : user est capé à 6 projets actifs. Tentative de créer `interim-preview-20260423` → fail quota. Purge de `n8nguedou` (DELETE_REQUESTED) ne libère pas le slot (compte différent des quotas projets). User a choisi option alternative : réutiliser le projet `arnaudguedou` (personnel) avec préfixes `interim-preview-*` sur toutes les ressources (isolation nommage).
+
+2. **Provisioning GCP** :
+   - APIs activées : run, sqladmin, sql-component, artifactregistry, cloudbuild.
+   - Artifact Registry repo `interim-preview` dans `europe-west1` (gratuit jusqu'à 500MB).
+   - Cloud SQL `interim-preview-pg` Postgres 16 f1-micro zonal — **important** : `db-f1-micro` exige `--edition=enterprise` (Enterprise Plus refuse shared-core). ~7 CHF/mois.
+   - DB `interim_dev` + user `interim_app` avec password random 20-char. Password sauvé dans `/tmp/interim-preview-db-pwd` (à déplacer en Secret Manager pour vrai staging).
+
+3. **Dockerfiles Next.js standalone** (nouveaux) :
+   - `apps/web-admin/Dockerfile` + `apps/web-portal/Dockerfile` : multi-stage monorepo-aware. Build stage `pnpm -F @interim/web-X build` avec `output: 'standalone'` + `outputFileTracingRoot` à la racine monorepo pour tracker les workspace deps. Runtime stage mince copie `.next/standalone` + `.next/static` + `public`.
+   - `apps/web-admin/public/` n'existe pas dans le repo → Dockerfile `RUN mkdir -p` dans le build stage avant COPY.
+   - `apps/web-admin/next.config.mjs` déjà avait une conf webpack pour `node:` scheme + fallbacks `crypto/fs/path/...`. **Ajout critique** : fallbacks `cluster/v8/perf_hooks/net/tls/async_hooks/worker_threads/dns` parce que `packages/shared/src/index.ts` re-exporte `prom-registry` (prom-client Node-only) et quand un client component importe depuis `@interim/shared`, webpack essaie de bundler prom-client pour le browser → fail sans ces fallbacks.
+   - `apps/web-portal/next.config.mjs` : rewrite complet avec même stack (extensionAlias NodeNext + fallbacks + standalone) — elle n'avait pas de config webpack avant.
+
+4. **Build + push 4 images** vers Artifact Registry (parallèle, ~5 min total).
+
+5. **Migrations + seed** contre Cloud SQL :
+   - Tentative Cloud SQL Auth Proxy via Docker → fail ADC (Windows gcloud creds à `%APPDATA%\gcloud` pas `~/.config/gcloud`).
+   - Fallback Option A : IP publique + `--authorized-networks=<my_ip>/32` temporairement, `prisma migrate deploy` + `prisma:seed` direct via `sslmode=require`, puis `--clear-authorized-networks` pour fermer.
+   - Seed a réussi : 1 agence `8b77fe02-4c3a-...` + 2 workers + 1 client + 947 fériés 26 cantons × 3 ans + audit log.
+
+6. **Deploy 4 Cloud Run services** (ordre : mock-MP d'abord pour obtenir son URL, puis API avec `MOVEPLANNER_BASE_URL` + Cloud SQL socket `--add-cloudsql-instances`, puis web-admin + web-portal avec `NEXT_PUBLIC_API_BASE_URL`) :
+   - Premier `gcloud run deploy` API → `Aborted by user` mystérieux. Enlever `--quiet` révèle que l'API `sql-component.googleapis.com` demandait activation interactive (y/N). Activée explicitement.
+   - `--env-vars-file=ops/preview-api-env.yaml` au lieu de `--set-env-vars` pour éviter les gotchas shell (`&` dans DATABASE_URL parsé comme fork, virgules dans URL parsées comme KEY=VAL suivant).
+   - Les 4 services déployés en `europe-west1` avec `--allow-unauthenticated`, min-instances=0 (cold start ~10s acceptable preview).
+
+7. **Verify end-to-end** :
+   - `curl https://interim-preview-api-332513055634.europe-west1.run.app/health` → `{"status":"ok"}`
+   - `curl -H "Authorization: Bearer test" .../api/v1/workers` → liste Jean Dupont + Marie Martin depuis Cloud SQL
+   - `curl -I https://interim-preview-web-admin-...` → 200, titre "Helvètia Intérim — Back-office"
+   - `curl -I https://interim-preview-web-portal-...` → 307 redirect /login, titre "Agence Intérim — Portail intérimaire"
+
+### Livrables
+
+- **PR #84 `a18c6b9`** : `main.ts` DI wiring + DevTokenVerifier + fix CI smoke test (240 lignes ajoutées, 3 fichiers).
+- **PR #85 `5eb2963`** : Dockerfiles Next.js + runbook `preview-deployment.md` (330 lignes) + template env file + `.gitignore` update (721 lignes ajoutées, 9 fichiers).
+- **Preview live** accessible à :
+  - https://interim-preview-api-332513055634.europe-west1.run.app
+  - https://interim-preview-web-admin-332513055634.europe-west1.run.app
+  - https://interim-preview-web-portal-332513055634.europe-west1.run.app
+  - https://interim-preview-mock-mp-332513055634.europe-west1.run.app
+
+### Décisions
+
+- **Projet GCP `arnaudguedou`** co-locataire (pas nouveau projet dédié) : user n'avait pas le quota pour un nouveau. Isolation par préfixe nommage `interim-preview-*`.
+- **Région `europe-west1`** (Belgique, pas Zurich) : user a dit "peu importe" pour preview + ~30% moins cher que europe-west6.
+- **Wiring minimal** : workers + documents + availability. `proposals`, `timesheets`, `ged`, `webhooks` sont optionnels dans `AppDeps` → câblage reporté quand BullMQ/Redis seront câblés.
+- **Impls in-memory test-helpers réutilisées** plutôt que créées séparément sous `apps/api/src/infrastructure/` : les test-helpers de `@interim/application` sont exportés via l'index public, donc utilisables en runtime pour preview. Acceptable preview, à remplacer par vraies impls (GCS, BullMQ, MP adapter) pour staging+.
+- **Option A (IP publique + authorized network)** pour migrations plutôt que Cloud SQL Auth Proxy : l'ADC Docker sur Windows ne marche pas out-of-the-box. Option A plus simple pour preview, documentée dans le runbook §5.1 comme fallback Windows. Staging+ = Option B proxy.
+- **`--env-vars-file`** au lieu de `--set-env-vars` : évite les gotchas de parsing shell (`&`, `,`) dans DATABASE_URL Cloud SQL.
+- **Password en clair dans `/tmp/`** (volontaire pour preview, limité à 24h local). Pour staging+ : Secret Manager obligatoire.
+
+### Dette ouverte / suite
+
+- **DETTE-042** (nouvelle, ouverte par cette session) : wiring DI reste — proposals + timesheets + ged + webhooks dans `main.ts`. Dépend de DETTE-015 (BullMQ/Redis) pour les handlers async. Note : DETTE-014 concerne le provisioning Firebase (action humaine externe), pas le wiring DI — distinction à faire pour l'orchestrateur.
+- **DETTE-015 (BullMQ + Redis wiring)** : toujours ouverte. La preview actuelle n'a pas de worker déployé et pas de Redis — webhooks MP reçus mais pas dispatchés async.
+- **Preview ≠ A0.4 prod** : nLPD non-compliant (pas de CMEK, Belgique pas Suisse, auth bypass). La preview ne remplace PAS A0.4 ; c'est un outil démo/test complémentaire.
+- **Coût mensuel preview** : ~8-10 CHF tant qu'elle tourne. Runbook §8 contient la procédure de kill / pause.
+
+### Prochain prompt
+
+**Retour à "STOP code-only — bascule actions externes" tant qu'une nouvelle priorité n'émerge pas.**
+
+Actions externes prioritaires identiques à session précédente :
+- A0.4 (provisioning GCP prod en Suisse + CMEK + Secret Manager + DPA + OIDC WIF)
+- A5.5 (Swissdec ELM sandbox)
+- A6.6 (pentest externe)
+- A6.7 (gameday DR + go-live)
+
+La preview offre maintenant un terrain de jeu cliquable pour :
+- Montrer l'app à un client pilote potentiel avant le commit go-live.
+- Valider les parcours UX sur vraie infra cloud avant A0.4.
+- Débug/smoke les régressions multi-services (PRs avec images Cloud Run rebuild).
+
+---
+
 ## Session 2026-04-23 18:00 — DETTE-037 : workflow CI dr-roundtrip (squelette PR #81 + enhancements PR #82)
 
 - **Opérateur** : Claude Code (Sonnet 4.5) — 2 PRs en chaîne : PR #81 (squelette workflow, mergée commit `4bbb891`) puis PR #82 (enhancements, cette session).

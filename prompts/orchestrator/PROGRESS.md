@@ -1,18 +1,26 @@
 # PROGRESS.md — État d'avancement du projet
 
-> **Dernière mise à jour** : 2026-04-23 19:00 — **DETTE-037 fully closed** (PR #81 squelette `4bbb891` + PR #82 enhancements `78933e0`) : workflow CI `dr-roundtrip.yml` avec 4 asserts explicites (`assert_sha256` + `assert_age_header` + `assert_rpo` 900s + `assert_rto` 14400s), scripts `ops/backup/*.sh` CI-friendly (JSON Lines si `CI=true`, exit codes 0-6 normalisés dans `_lib.sh`), job shellcheck en gate, artifacts enrichis on failure, runbook DR §7 "Validation CI automatique" avec gameday checklist. **Test régression intentionnel exécuté** (sha256 random injecté → workflow rouge sur assert_sha256 → revert → vert). **44/48 prompts catalogue** + 2 PRs ad-hoc. **Sprint A.6 complet côté code.** Reste uniquement actions externes : A0.4 (provisioning GCP/Infomaniak) + A5.5 (Swissdec sandbox) + A6.6 (pentest) + A6.7 (go-live). **Prochain prompt : STOP code-only → bascule orchestrateur vers actions externes.**
+> **Dernière mise à jour** : 2026-04-23 20:30 — **Wiring DI minimal livré** (PR #84 `a18c6b9` — pas DETTE-014, qui concerne Firebase) dans `main.ts` pour workers + documents + availability. `AUTH_MODE=dev` bypass via `DevTokenVerifier` (n'importe quel Bearer token → agency_admin sur 1ère agence). Ouvre **DETTE-042** pour le reste du wiring (proposals + timesheets + ged + webhooks, dépendent de DETTE-015 BullMQ). **Phase 2 GCP preview live** (PR #85 `5eb2963`) : 4 services Cloud Run déployés en `europe-west1` (API + mock-MP + web-admin + web-portal) sur le projet `arnaudguedou` (co-locataire avec préfixe `interim-preview-*`) + Cloud SQL Postgres 16 f1-micro enterprise zonal. Coût ~8-10 CHF/mois. Dockerfiles Next.js standalone + runbook `preview-deployment.md` (330 lignes) committés. **Preview ≠ A0.4** — pas nLPD-compliant (Belgique, pas CMEK, AUTH_MODE=dev). **Prochain prompt : STOP code-only** — retour à la bascule actions externes (A0.4, A5.5, A6.6, A6.7) ; la preview est un outil démo/test complémentaire et n'annule aucune dépendance prod.
 > **Source de vérité** pour l'orchestrateur. **Ne jamais** le mettre à jour à la main sans avoir suivi le protocole `ORCHESTRATOR.md`.
 
 ---
 
 ## 0. Instantané
 
-- **Sprint courant** : A.6 (5/7 prompts complétés côté code — A6.6 + A6.7 restent en actions externes)
-- **Phase** : MVP + observabilité production-ready (logs structurés, dashboards Grafana **vivants** avec 20 business counters, alertes P1/P2/P3, DR RPO ≤ 6 min RTO ≤ 4h démontrés, **workflow CI DETTE-037 verrouille la non-régression DR mensuellement**). Restent **uniquement** actions externes (pas de code à écrire côté Claude) : A0.4, A5.5, A6.6, A6.7.
-- **Prochain prompt** : **STOP code-only — bascule actions externes.** Le code sprint A.6 est terminé. Voir **§1 "STOP code-only"** ci-dessous pour l'ordre des actions humaines (A0.4, A5.5, A6.6, A6.7).
+- **Sprint courant** : A.6 (5/7 prompts complétés côté code — A6.6 + A6.7 restent en actions externes). Dépassement opportuniste post A.6 : wiring DI minimal (PR #84, ouvre DETTE-042 pour reste) + preview GCP live (PR #85).
+- **Phase** : MVP + observabilité production-ready (logs structurés, dashboards Grafana **vivants** avec 20 business counters, alertes P1/P2/P3, DR RPO ≤ 6 min RTO ≤ 4h démontrés, workflow CI DETTE-037). **Preview live accessible** sur Cloud Run (outil démo/test, PAS production — cf. §1). Restent toujours **uniquement** actions externes pour go-live réel : A0.4, A5.5, A6.6, A6.7.
+- **Preview URLs (live)** :
+  - API : https://interim-preview-api-332513055634.europe-west1.run.app
+  - Back-office : https://interim-preview-web-admin-332513055634.europe-west1.run.app
+  - Portail intérimaire : https://interim-preview-web-portal-332513055634.europe-west1.run.app
+  - Mock MovePlanner : https://interim-preview-mock-mp-332513055634.europe-west1.run.app
+  - Auth : `Authorization: Bearer <anything>` (AUTH_MODE=dev) → agency_admin sur "Agence Pilote SA"
+  - Cloud SQL : `interim-preview-pg` Postgres 16 f1-micro enterprise zonal (europe-west1)
+  - Coût : ~8-10 CHF/mois — procédure kill dans `docs/runbooks/preview-deployment.md` §8
+- **Prochain prompt** : **STOP code-only — bascule actions externes.** La preview est un terrain de jeu cliquable mais n'annule aucune dépendance prod. Voir **§1 "STOP code-only"** ci-dessous pour l'ordre des actions humaines (A0.4, A5.5, A6.6, A6.7).
 - **Prompts complétés** : 44 / 48 catalogue (91.7%) + 2 ad-hoc (design + dev fix) + 0 / 5 OPS
 - **Blockers ouverts** : 2 (BLOCKER-001 sandbox MP, BLOCKER-002 autorisation LSE — externes, non-dev)
-- **Dette technique** : 13 ouvertes / 26 fermées (DETTE-033/035 closes, 2 nouvelles DETTE-040/041 wiring runtime)
+- **Dette technique** : 14 ouvertes / 26 fermées (DETTE-033/035/037 closes, DETTE-040/041/042 wiring runtime ouvertes)
 - **Tests** : **1210 unit + 53 integration** sur 8 workspaces (vs 1167/53 ; +43 unit)
 - **Coverage domain payroll** : 98.86% lines (inchangé). **Coverage shared** : +20 tests observability registry
 - **Vélocité observée** : 44 prompts catalogue + 2 ad-hoc + 5 DETTE résolues en 43 heures (sprint marathon 2026-04-21 → 2026-04-23 15:00)
@@ -289,6 +297,7 @@ Décisions prises et non renégociables sans ADR. Mettre à jour au fil de l'eau
 | ~~DETTE-035~~ | ~~2026-04-23~~ | ~~Exposer métriques business `payroll_batch_*`, `availability_outbox_*`, `pg_dump_*`, `wal_archive_*`, `dr_restore_*`~~ — **CLOSE 2026-04-23 15:00 via PR #79** : 20 métriques (5 paie + 4 avail + 8 DR + 3 MP) avec `hashAgencyId` + `assertLabelHygiene` au boot | ~~S~~ | ✅ |
 | DETTE-040 | 2026-04-23 | Wire les counters dans `apps/worker/src/main.ts` quand le DI Redis + Prisma sera prêt (DETTE-014/015 done). Propager `agencyId` depuis job BullMQ vers `metrics.recordAvailabilityOutboxPushed` | S | A.7 (avec wiring runtime) |
 | DETTE-041 | 2026-04-23 | Wire `onScrape` hook côté worker pour scraper Postgres et mettre à jour `availability_outbox_pending_count` + `availability_outbox_lag_seconds`. Sans ça, ces 2 gauges restent à 0 | S | A.6 (court terme, faisable immédiatement) |
+| DETTE-042 | 2026-04-23 | Wiring DI complet dans `apps/api/src/main.ts` : câbler `proposals`, `timesheets`, `ged`, `webhooks` (actuellement `AppDeps` les rend optionnels, skippés en preview). Impl in-memory pour `InMemoryLegalArchive`, `InMemoryInboundWebhook`, etc. OU Prisma-backed (préféré pour audit trail réel). Dépend de DETTE-015 (BullMQ/Redis) pour les webhook handlers async | M | A.7 (avec DETTE-015) |
 | ~~DETTE-036~~ | ~~2026-04-23~~ | ~~A5.2 divergence : (a) port TS vs table Prisma ; (b) Tessin manquant ; (c) règle "plus favorable"~~ — **CLOSE 2026-04-23 13:00 via PR #77** : table Prisma versionnée + 26 cantons (Tessin inclus) + `applyContractOverrides()` + 947 rows seedées + 9 integration tests + coverage 98.86% | ~~M~~ | ✅ |
 | DETTE-036(a) bis | 2026-04-23 | ADR formelle pour entériner double mécanisme (port TS fallback + table Prisma source de vérité) OU supprimer `StaticCantonHolidaysPort` après wiring complet | S | A.7 |
 | ~~DETTE-037~~ | ~~2026-04-23~~ | ~~Job CI mensuel qui exécute `ops/backup/test-roundtrip.sh` dans GitHub Actions~~ — **CLOSE 2026-04-23 19:00 via PR #81 (squelette `4bbb891`) + PR #82 (enhancements `78933e0`)** : workflow `.github/workflows/dr-roundtrip.yml` avec 4 asserts (`assert_sha256` + `assert_age_header` + `assert_rpo` + `assert_rto`), scripts `ops/backup/*.sh` CI-friendly (JSON Lines + exit codes 0-6 via `_lib.sh`), shellcheck gate, artifacts enrichis on failure, runbook §7 "Validation CI automatique", test régression intentionnel exécuté avec succès | ~~M~~ | ✅ |
@@ -318,7 +327,7 @@ DETTE-001 (composite TS, reportée A.6) · DETTE-002 (repo GitHub) · DETTE-003 
 | Couverture api | 87.24% lines / 75.24% branches | ≥ 80%/70% | 🟢 |
 | Blockers conformité ouverts | 1 (LSE — externe) | 0 avant go-live | 🟡 |
 | Blockers techniques ouverts | 1 (sandbox MP — externe) | 0 avant go-live | 🟡 |
-| Dettes techniques qualifiées | 13 ouvertes (5 externes + 1 A6.5 + 3 DETTE-036 sub + 2 DETTE-040/041 nouvelles + 1 A6.3 DETTE-034) / 26 fermées | < 10 ouvertes | 🟡 |
+| Dettes techniques qualifiées | 14 ouvertes (5 externes + 1 A6.5 + 3 DETTE-036 sub + 3 DETTE-040/041/042 wiring + 1 A6.3 DETTE-034 + 1 DETTE-039) / 26 fermées | < 10 ouvertes | 🟡 |
 | PR avec revue humaine | 100% (toutes les 50+ PRs mergées via gh admin merge) | 100% | 🟢 |
 | Vélocité observée (prompts/jour) | ~14 (sprint marathon 36h) | 4–6 régime de croisière | 🟢 |
 | Incidents staging / sem | n/a (pas encore staging) | < 2 | — |
