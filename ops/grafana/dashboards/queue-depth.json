@@ -1,71 +1,131 @@
 {
   "uid": "queue-depth",
-  "title": "BullMQ queues — depth & workers",
+  "title": "Workers — outbox & queue depth",
   "tags": ["interim", "queue", "workers"],
   "timezone": "Europe/Zurich",
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "refresh": "30s",
-  "time": { "from": "now-1h", "to": "now" },
+  "time": { "from": "now-3h", "to": "now" },
   "panels": [
     {
       "id": 1,
-      "type": "table",
-      "title": "État des queues",
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
+      "type": "stat",
+      "title": "Availability outbox — total pending",
+      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 0 },
+      "datasource": { "uid": "prometheus", "type": "prometheus" },
+      "targets": [{ "expr": "sum(availability_outbox_pending_count)", "refId": "A" }],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 100 },
+              { "color": "red", "value": 1000 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Outbox lag max (seconds)",
+      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 0 },
+      "datasource": { "uid": "prometheus", "type": "prometheus" },
+      "targets": [{ "expr": "max(availability_outbox_lag_seconds)", "refId": "A" }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 300 },
+              { "color": "red", "value": 900 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Processed (1h, par status)",
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 0 },
       "datasource": { "uid": "prometheus", "type": "prometheus" },
       "targets": [
         {
-          "expr": "bullmq_jobs_waiting",
-          "refId": "waiting",
-          "legendFormat": "{{queue}}",
-          "format": "table",
-          "instant": true
-        },
-        {
-          "expr": "bullmq_jobs_active",
-          "refId": "active",
-          "legendFormat": "{{queue}}",
-          "format": "table",
-          "instant": true
-        },
-        {
-          "expr": "bullmq_jobs_completed",
-          "refId": "completed",
-          "legendFormat": "{{queue}}",
-          "format": "table",
-          "instant": true
-        },
-        {
-          "expr": "bullmq_jobs_failed",
-          "refId": "failed",
-          "legendFormat": "{{queue}}",
-          "format": "table",
-          "instant": true
+          "expr": "sum by (status) (increase(availability_outbox_processed_total[1h]))",
+          "refId": "A",
+          "legendFormat": "{{status}}"
         }
       ]
     },
     {
       "id": 10,
       "type": "timeseries",
-      "title": "Jobs en attente (waiting) par queue",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "title": "Pending outbox par tenant (3h)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
       "datasource": { "uid": "prometheus", "type": "prometheus" },
-      "targets": [{ "expr": "bullmq_jobs_waiting", "refId": "A", "legendFormat": "{{queue}}" }]
+      "targets": [
+        {
+          "expr": "availability_outbox_pending_count",
+          "refId": "A",
+          "legendFormat": "{{agency_id_hash}}"
+        }
+      ]
     },
     {
       "id": 11,
       "type": "timeseries",
-      "title": "Jobs failed par queue (cumul DLQ)",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "title": "Outbox lag par tenant (3h)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
       "datasource": { "uid": "prometheus", "type": "prometheus" },
-      "targets": [{ "expr": "bullmq_jobs_failed", "refId": "A", "legendFormat": "{{queue}}" }]
+      "targets": [
+        {
+          "expr": "availability_outbox_lag_seconds",
+          "refId": "A",
+          "legendFormat": "{{agency_id_hash}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Push duration p95 par status",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "datasource": { "uid": "prometheus", "type": "prometheus" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (status, le) (rate(availability_outbox_push_duration_seconds_bucket[5m])))",
+          "refId": "A",
+          "legendFormat": "{{status}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Rate processed par status (5m)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "datasource": { "uid": "prometheus", "type": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (status) (rate(availability_outbox_processed_total[5m]))",
+          "refId": "A",
+          "legendFormat": "{{status}}"
+        }
+      ]
     },
     {
       "id": 20,
       "type": "logs",
       "title": "Logs workers (level=error|warn)",
-      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 16 },
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 20 },
       "datasource": { "uid": "loki", "type": "loki" },
       "targets": [{ "expr": "{service=\"worker\", level=~\"error|warn\"}", "refId": "A" }],
       "options": { "showTime": true, "wrapLogMessage": true, "sortOrder": "Descending" }

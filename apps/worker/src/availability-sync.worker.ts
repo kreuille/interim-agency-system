@@ -21,6 +21,22 @@ export interface AvailabilitySyncWorkerDeps {
   readonly concurrency?: number;
   /** Si saturation détectée, taille au-dessus de laquelle on re-trigger. */
   readonly saturationThreshold?: number;
+  /**
+   * Hook optionnel pour publier les compteurs Prometheus (DETTE-035) :
+   *   - `availability_outbox_processed_total{agency_id_hash, status}`
+   *   - `availability_outbox_push_duration_seconds`
+   * À wire au bootstrap dans `apps/worker/src/main.ts` avec
+   * `createBusinessMetrics().recordAvailabilityOutboxPushed()`.
+   *
+   * Si non fourni → no-op (idéal pour les tests existants).
+   */
+  readonly onResult?: (result: {
+    readonly processed: number;
+    readonly succeeded: number;
+    readonly retried: number;
+    readonly dead: number;
+    readonly durationSeconds: number;
+  }) => void;
 }
 
 /**
@@ -47,12 +63,24 @@ export function createAvailabilitySyncWorker(
   return new Worker<AvailabilitySyncJob>(
     AVAILABILITY_SYNC_QUEUE_NAME,
     async (_job: Job<AvailabilitySyncJob>) => {
+      const startedAt = Date.now();
       const result = await deps.drain.execute();
       // Re-enqueue automatiquement si on a saturé le batch (filet pour
       // les forts volumes : on continue à drainer jusqu'à vider).
       if (result.processed >= threshold) {
         await deps.queue.add(AVAILABILITY_SYNC_QUEUE_NAME, { tick: 'realtime' });
       }
+      // Publication métriques (no-op si pas wiré).
+      // `PushAvailabilityResult` : processed, succeeded, failed, dead.
+      // failed = transient (ré-essayé plus tard) ; dead = max retries
+      // dépassés (DLQ alerting).
+      deps.onResult?.({
+        processed: result.processed,
+        succeeded: result.succeeded,
+        retried: result.failed,
+        dead: result.dead,
+        durationSeconds: (Date.now() - startedAt) / 1000,
+      });
       return result;
     },
     {

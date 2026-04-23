@@ -15,7 +15,8 @@
     "@interim/domain": "workspace:*",
     "@interim/shared": "workspace:*",
     "bullmq": "^5.34.5",
-    "ioredis": "^5.4.1"
+    "ioredis": "^5.4.1",
+    "prom-client": "^15.1.3"
   },
   "devDependencies": {
     "@types/node": "^20.17.0",
