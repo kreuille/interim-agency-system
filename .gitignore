@@ -31,3 +31,9 @@ Thumbs.db
 # La clé identity est PRIVÉE — JAMAIS committer.
 # Voir ops/backup/README.md § Préparation locale.
 ops/backup/test-keys/
+
+# Env files pour deploy preview GCP (Phase 2) — contiennent DB password +
+# URLs Cloud Run résolues. Le template sans secrets s'appelle
+# `preview-api-env.yaml` (committé) ; la variante avec vraies valeurs
+# est `preview-api-env.local.yaml` (gitignorée).
+ops/preview-*.local.yaml

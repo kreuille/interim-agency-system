@@ -1,6 +1,19 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  /**
+   * Standalone output pour Cloud Run (Phase 2 preview) : produit un serveur
+   * Node.js autonome dans `.next/standalone/` avec ses deps minimales.
+   * `outputFileTracingRoot` pointé sur la racine monorepo pour que Next
+   * traque aussi les deps des workspace packages (`@interim/domain`, etc.).
+   */
+  output: 'standalone',
+  outputFileTracingRoot: path.join(__dirname, '../../'),
   /**
    * Permet à webpack de résoudre les imports TypeScript écrits avec extension
    * `.js` (convention NodeNext utilisée dans tout le monorepo). Sans ça, le
@@ -31,6 +44,21 @@ const nextConfig = {
         os: false,
         stream: false,
         buffer: false,
+        // prom-client (transit via `@interim/shared/observability/prom-registry`)
+        // pull cluster + v8 + net + tls qui sont Node-only. On les neutralise
+        // pour le bundle client — jamais exécutés côté navigateur.
+        cluster: false,
+        v8: false,
+        net: false,
+        tls: false,
+        child_process: false,
+        http: false,
+        https: false,
+        zlib: false,
+        perf_hooks: false,
+        async_hooks: false,
+        worker_threads: false,
+        dns: false,
       };
     }
     return config;

@@ -1,0 +1,17 @@
+# Template pour `gcloud run deploy ... --env-vars-file=preview-api-env.yaml`.
+#
+# ⚠️ NE PAS committer avec de vraies valeurs — ce fichier est un TEMPLATE.
+# La variante réelle (avec DB_PWD + URL Cloud Run résolues) vit à côté en
+# `preview-api-env.local.yaml` (gitignoré) ou dans Secret Manager.
+#
+# Substitutions à faire avant deploy :
+#   - REPLACE_MP_URL        → URL du service Cloud Run mock-moveplanner déployé
+#                             (ex: https://interim-preview-mock-mp-XXXXX.europe-west1.run.app)
+#   - REPLACE_DB_PASSWORD   → password du user `interim_app` (Secret Manager en prod)
+#   - REPLACE_CLOUD_SQL_CONN → connection name Cloud SQL
+#                             (ex: arnaudguedou:europe-west1:interim-preview-pg)
+
+NODE_ENV: production
+AUTH_MODE: dev
+MOVEPLANNER_BASE_URL: REPLACE_MP_URL
+DATABASE_URL: postgresql://interim_app:REPLACE_DB_PASSWORD@localhost/interim_dev?host=/cloudsql/REPLACE_CLOUD_SQL_CONN&schema=public
