@@ -1,0 +1,50 @@
+# Tempo — distributed tracing backend pour Helvètia Intérim
+#
+# Reçoit les traces OTel via le protocole OTLP (gRPC port 4317 + HTTP port 4318).
+# L'API et les workers exportent vers `OTEL_EXPORTER_OTLP_ENDPOINT=http://tempo:4318`.
+#
+# Stockage : filesystem local en dev, à migrer vers GCS en prod
+# (storage.trace.backend = gcs).
+#
+# Rétention : 15 jours (skill observability §rétention).
+
+server:
+  http_listen_port: 3200
+  grpc_listen_port: 9095
+  log_level: warn
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+
+ingester:
+  trace_idle_period: 10s
+  max_block_bytes: 1_000_000
+  max_block_duration: 5m
+
+compactor:
+  compaction:
+    block_retention: 360h # 15 jours
+    compacted_block_retention: 1h
+
+storage:
+  trace:
+    backend: local
+    local:
+      path: /var/tempo/blocks
+    wal:
+      path: /var/tempo/wal
+    pool:
+      max_workers: 100
+      queue_depth: 10000
+
+# Pas de metrics_generator ici (Tempo peut générer des métriques RED
+# depuis les traces — feature avancée à activer en sprint A.7+).
+
+usage_report:
+  reporting_enabled: false

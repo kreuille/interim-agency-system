@@ -1,0 +1,61 @@
+# Grafana datasources — provisioning automatique au démarrage.
+#
+# Trois sources : Prometheus (métriques), Loki (logs), Tempo (traces).
+# Les noms `Prometheus`, `Loki`, `Tempo` sont référencés littéralement
+# dans les dashboards JSON (`datasource.uid` = nom).
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    uid: prometheus
+    isDefault: true
+    editable: false
+    jsonData:
+      timeInterval: 15s
+      # Lien Prometheus → Tempo : permet de cliquer une métrique et
+      # récupérer la trace correspondante via exemplars
+      exemplarTraceIdDestinations:
+        - name: trace_id
+          datasourceUid: tempo
+
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    uid: loki
+    editable: false
+    jsonData:
+      maxLines: 1000
+      # Lien Loki → Tempo : depuis une ligne de log avec correlationId,
+      # ouvrir la trace OTel correspondante
+      derivedFields:
+        - datasourceUid: tempo
+          matcherRegex: '"correlationId":"([0-9a-f-]+)"'
+          name: trace_id
+          url: '$${__value.raw}'
+
+  - name: Tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:3200
+    uid: tempo
+    editable: false
+    jsonData:
+      # Lien Tempo → Loki : depuis une trace, retrouver les logs liés
+      tracesToLogsV2:
+        datasourceUid: loki
+        spanStartTimeShift: -1h
+        spanEndTimeShift: 1h
+        filterByTraceID: true
+        customQuery: true
+        query: '{service="$${__span.tags.service}"} |= "$${__trace.traceId}"'
+      # Lien Tempo → Prometheus : depuis une trace, voir les métriques RED
+      tracesToMetrics:
+        datasourceUid: prometheus
+        queries:
+          - name: 'Rate'
+            query: 'sum(rate(http_request_duration_seconds_count{$$__tags}[5m]))'

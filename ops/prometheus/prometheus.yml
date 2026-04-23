@@ -1,0 +1,53 @@
+# Prometheus scrape configuration — stack observabilité Helvètia Intérim
+#
+# Scrape l'API (/metrics OpenMetrics format) + node_exporter pour les
+# métriques système. Les règles d'alerting sont chargées depuis
+# alertmanager.rules.yml et envoyées à Alertmanager.
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: helvetia-interim
+    env: ${ENV:-local}
+
+# Charge les règles d'alerte. Chaque alerte y déclenchée est routée
+# vers Alertmanager pour dispatch (SMS, email, Slack...).
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+# Cible Alertmanager
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+scrape_configs:
+  # API back-office — endpoint /metrics ouvert (réseau privé prod)
+  - job_name: interim-api
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - api:3000
+        labels:
+          service: api
+          component: backend
+
+  # Workers (BullMQ scan + sync + reminders + GED purge)
+  # Exposent /metrics sur port 9090 (à wire dans apps/worker/main.ts si
+  # observabilité worker activée — DETTE).
+  - job_name: interim-worker
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - worker:9090
+        labels:
+          service: worker
+          component: backend
+
+  # Prometheus lui-même (auto-monitoring)
+  - job_name: prometheus
+    static_configs:
+      - targets:
+          - localhost:9090

@@ -1,0 +1,86 @@
+# Règles d'alerte P2 (dégradation, Slack uniquement) — Helvètia Intérim
+#
+# Routées vers Alertmanager → receiver `dev-team` (Slack `#alerts` channel).
+
+groups:
+  - name: api-performance
+    interval: 30s
+    rules:
+      # Latence p95 > 2s sur 10 min
+      - alert: ApiHighLatencyP95
+        expr: |
+          histogram_quantile(0.95,
+            sum by (le, route) (rate(http_request_duration_seconds_bucket{job="interim-api"}[5m]))
+          ) > 2
+        for: 10m
+        labels:
+          severity: P2
+          service: api
+        annotations:
+          summary: 'API p95 latence {{ $labels.route }} > 2s ({{ $value | humanizeDuration }})'
+          runbook: 'Ouvrir trace OTel correspondante dans Tempo (lien dans dashboard `api-health`)'
+
+      # Taux 4xx > 10% (signale soit attaque, soit régression API)
+      - alert: ApiHigh4xxRate
+        expr: |
+          sum(rate(http_request_duration_seconds_count{job="interim-api",status=~"4.."}[5m]))
+            /
+          sum(rate(http_request_duration_seconds_count{job="interim-api"}[5m]))
+            > 0.10
+        for: 10m
+        labels:
+          severity: P2
+          service: api
+        annotations:
+          summary: 'Taux 4xx API > 10% ({{ $value | humanizePercentage }})'
+
+  - name: moveplanner-integration
+    interval: 30s
+    rules:
+      # Circuit breaker MovePlanner ouvert > 10 min
+      - alert: MoveplannerCircuitBreakerOpen
+        expr: mp_cb_state{name="moveplanner"} == 2
+        for: 10m
+        labels:
+          severity: P2
+          service: api
+          domain: integration
+        annotations:
+          summary: 'Circuit breaker MovePlanner ouvert depuis 10+ min'
+          runbook: 'docs/runbooks/mp-unreachable.md'
+          impact: "Push d'availability et acceptances de propositions en outbox — drainage automatique à la fermeture du circuit"
+
+      # Taux d'échec push MP > 5%
+      - alert: MoveplannerPushFailureRate
+        expr: |
+          sum(rate(mp_request_total{status="5xx"}[5m]))
+            /
+          sum(rate(mp_request_total[5m]))
+            > 0.05
+        for: 10m
+        labels:
+          severity: P2
+          service: api
+          domain: integration
+        annotations:
+          summary: 'Échec push MovePlanner > 5% ({{ $value | humanizePercentage }})'
+
+  - name: webhooks-security
+    interval: 30s
+    rules:
+      # Taux d'échec signature HMAC > 10% — signale rotation mal faite OU
+      # tentative de spoofing
+      - alert: WebhookHmacFailureRate
+        expr: |
+          sum(rate(inbound_webhook_received_total{outcome="rejected"}[5m]))
+            /
+          sum(rate(inbound_webhook_received_total[5m]))
+            > 0.10
+        for: 5m
+        labels:
+          severity: P2
+          service: api
+          domain: security
+        annotations:
+          summary: 'Webhook HMAC failure rate > 10% ({{ $value | humanizePercentage }})'
+          runbook: 'Vérifier rotation secret HMAC côté MovePlanner ; sinon investiguer logs sécurité (origines suspectes)'

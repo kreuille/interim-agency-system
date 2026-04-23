@@ -1,4 +1,5 @@
 import express, { type Express, type Request, type Response } from 'express';
+import { pinoHttp } from 'pino-http';
 import type {
   AcceptOnBehalfUseCase,
   AddSlotUseCase,
@@ -27,10 +28,12 @@ import type {
 } from '@interim/domain';
 import { createAuthMiddleware, type TokenVerifier } from './shared/middleware/auth.middleware.js';
 import { tenantMiddleware } from './shared/middleware/tenant.middleware.js';
+import { requestIdMiddleware } from './shared/middleware/request-id.middleware.js';
 import {
   createIdempotencyMiddleware,
   type IdempotencyStore,
 } from './shared/middleware/idempotency.middleware.js';
+import { getDefaultLogger } from './infrastructure/observability/logger.js';
 import { createWorkersRouter } from './infrastructure/http/controllers/workers.controller.js';
 import { createWorkerDocumentsRouter } from './infrastructure/http/controllers/worker-documents.controller.js';
 import { createAvailabilityRouter } from './infrastructure/http/controllers/availability.controller.js';
@@ -90,6 +93,41 @@ export interface AppDeps {
 export function createApp(deps?: AppDeps): Express {
   const app = express();
   app.disable('x-powered-by');
+
+  // Correlation-id sur TOUTES les requêtes (avant logger pour qu'il puisse
+  // l'inclure dans chaque ligne).
+  app.use(requestIdMiddleware);
+
+  // Logger pino-http : 1 ligne par requête HTTP terminée, format JSON,
+  // PII redactée par la config du logger (cf. `infrastructure/observability/logger.ts`).
+  // Désactivé en test (NODE_ENV=test) pour ne pas polluer la sortie vitest.
+  if (process.env.NODE_ENV !== 'test') {
+    app.use(
+      pinoHttp({
+        logger: getDefaultLogger(),
+        // Propage le request-id (posé par requestIdMiddleware) au lieu de
+        // laisser pino-http en générer un nouveau.
+        genReqId: (req) => {
+          const id = (req as { id?: string }).id;
+          return id ?? 'unknown';
+        },
+        customLogLevel: (_req, res, err) => {
+          if (err || res.statusCode >= 500) return 'error';
+          if (res.statusCode >= 400) return 'warn';
+          return 'info';
+        },
+        // Désactive la signature par défaut (trop verbeuse) — on garde le minimum utile.
+        serializers: {
+          req: (req: { method: string; url: string; id?: string }) => ({
+            method: req.method,
+            url: req.url,
+            id: req.id,
+          }),
+          res: (res: { statusCode: number }) => ({ statusCode: res.statusCode }),
+        },
+      }),
+    );
+  }
 
   // IMPORTANT : monter le router webhook AVANT `express.json()` pour
   // préserver les bytes raw du body (HMAC computed over raw bytes).

@@ -1,0 +1,63 @@
+# Promtail — agent de shipping de logs vers Loki.
+#
+# Scrape les logs JSON pino émis par l'API et les workers via le driver
+# Docker logging (json-file driver). Parse le format JSON, extrait les
+# labels low-cardinality (service, level, env), et pousse à Loki.
+#
+# Rappel : les PII sont déjà redactées source-side par le logger pino
+# (cf. `apps/api/src/infrastructure/observability/logger.ts`). Promtail
+# ne fait PAS de post-processing PII (defense-in-depth, mais la source
+# est la garantie).
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+  log_level: warn
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # Scrape les containers Docker via leur log driver json-file
+  - job_name: docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+        # Filtre uniquement les containers du projet (label compose)
+        filters:
+          - name: label
+            values: ['com.docker.compose.project=interim']
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
+        target_label: 'service'
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_project']
+        target_label: 'project'
+      - source_labels: ['__meta_docker_container_log_stream']
+        target_label: 'stream'
+    pipeline_stages:
+      # Parse le JSON pino
+      - json:
+          expressions:
+            level: level
+            time: time
+            service: service
+            correlationId: correlationId
+            msg: msg
+      # Promote level + service comme labels Loki (low-cardinality)
+      - labels:
+          level:
+          service:
+      # Garde le timestamp pino (ISO) plutôt que celui du log file
+      - timestamp:
+          source: time
+          format: RFC3339Nano
+          fallback_formats:
+            - RFC3339
+      # Drop les lignes debug en production (réduit le volume)
+      - drop:
+          source: level
+          expression: 'debug'
+          drop_counter_reason: 'debug_in_prod'
