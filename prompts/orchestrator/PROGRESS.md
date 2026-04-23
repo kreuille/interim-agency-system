@@ -12,7 +12,7 @@
 - **Prochain prompt** : `A6.5-backup-restore-dr-test` (scripts pg_dump + restore + runbook DR + test E2E docker-compose, M ~1 jour, préparable en local sans GCP)
 - **Prompts complétés** : 43 / 48 catalogue (89.6%) + 2 ad-hoc (design + dev fix) + 0 / 5 OPS
 - **Blockers ouverts** : 2 (BLOCKER-001 sandbox MP, BLOCKER-002 autorisation LSE — externes, non-dev)
-- **Dette technique** : 8 ouvertes / 23 fermées (006/008/014/015/016 + 3 nouvelles A6.3 : DETTE-033/034/035)
+- **Dette technique** : 9 ouvertes / 23 fermées (006/008/014/015/016 + 3 A6.3 : DETTE-033/034/035 + DETTE-036 A5.2 divergence)
 - **Tests** : **1095 unit + 6 integration** sur 8 workspaces (vs 1081 avant ; +14 tests A6.3)
 - **Vélocité observée** : 43 prompts en 38 heures (sprint marathon 2026-04-21 → 2026-04-23 09:30)
 - **Skills disponibles** : 32 (voir `skills/README.md`)
@@ -85,7 +85,7 @@
 | Prompt | Complété le | PR | Commit | Notes |
 |--------|-------------|----|----|-------|
 | `A5.1-payroll-engine-cct` | 2026-04-22 | [#58](https://github.com/kreuille/interim-agency-system/pull/58) | `a7cbe22` | Moteur de paie hebdo pur domain — CCT × heures × majo |
-| `A5.2-payroll-majorations` | 2026-04-22 | (inclus dans #58) | `a7cbe22` | `surcharge-rules.ts` + `canton-holidays.ts` (jours fériés VD/GE/FR/VS/BE/NE/JU/TI/ZH) bundlés avec A5.1 |
+| `A5.2-payroll-majorations` ⚠️ | 2026-04-22 | (inclus dans #58) | `a7cbe22` | `surcharge-rules.ts` + `canton-holidays.ts` bundlés avec A5.1. **Divergence** : DETTE-036 — port TS `StaticCantonHolidaysPort` (11 cantons : GE/VD/FR/NE/JU/BE/ZH/BS/BL/AG/VS) au lieu de table Prisma `canton_holidays` seedée. TI manquant. Règle "plus favorable" contrat>CCT non implémentée. Esprit du prompt satisfait (majorations correctement appliquées dans payroll-engine), lettre non. |
 | `A5.3-payroll-retenues-sociales` | 2026-04-22 | [#59](https://github.com/kreuille/interim-agency-system/pull/59) | `c158443` | AVS/AC/LAA/LPP + IS cantonal + arrondi 5cts NET |
 | `A5.4-payslip-pdf-standard-ch` | 2026-04-22 | [#60](https://github.com/kreuille/interim-agency-system/pull/60) | `257258e` | Bulletin de paie PDF déterministe |
 | `A5.6-iso20022-pain001-export` | 2026-04-22 | [#61](https://github.com/kreuille/interim-agency-system/pull/61) | `ad239e4` | Export ISO 20022 pain.001.001.09 CH |
@@ -246,7 +246,7 @@ Décisions prises et non renégociables sans ADR. Mettre à jour au fil de l'eau
 
 ## 5. Dettes techniques qualifiées
 
-### Dettes ouvertes (8)
+### Dettes ouvertes (9)
 
 | ID | Ouverte le | Description | Priorité | ETA |
 |----|------------|-------------|----------|-----|
@@ -258,6 +258,7 @@ Décisions prises et non renégociables sans ADR. Mettre à jour au fil de l'eau
 | DETTE-033 | 2026-04-23 | Wire `/metrics` endpoint sur `apps/worker/main.ts` (port 9090) avec counters BullMQ par queue. Sans ça, dashboards `queue-depth` et `mp-health` (outbox lag) restent vides | M | A.6 (court — S) |
 | DETTE-034 | 2026-04-23 | Implémenter `oncall-sms-bridge` (passerelle webhook → Swisscom SMS API) ou wire un service tiers (PagerDuty, Opsgenie). Sinon receiver `on-call` Alertmanager n'envoie qu'à Slack | M | A.7 |
 | DETTE-035 | 2026-04-23 | Exposer métriques business `payroll_batch_*` et `availability_outbox_*` référencées par les dashboards | S | A.6 (court — S) |
+| DETTE-036 | 2026-04-23 | A5.2 divergence : (a) ADR formelle pour entériner port TS `StaticCantonHolidaysPort` au lieu de table Prisma `canton_holidays` seedée OU migration vers table Prisma + seed 2026-2028 ; (b) ajouter Tessin (TI) dans `CANTONAL_FIXED` ; (c) implémenter règle "plus favorable" contrat client > CCT | M | A.6 ou ADR rapide |
 
 ### Dettes fermées (23)
 
@@ -282,7 +283,7 @@ DETTE-001 (composite TS, reportée A.6) · DETTE-002 (repo GitHub) · DETTE-003 
 | Couverture api | 87.24% lines / 75.24% branches | ≥ 80%/70% | 🟢 |
 | Blockers conformité ouverts | 1 (LSE — externe) | 0 avant go-live | 🟡 |
 | Blockers techniques ouverts | 1 (sandbox MP — externe) | 0 avant go-live | 🟡 |
-| Dettes techniques qualifiées | 8 ouvertes (5 externes + 3 nouvelles A6.3 court terme) / 23 fermées | < 10 ouvertes | 🟢 |
+| Dettes techniques qualifiées | 9 ouvertes (5 externes + 3 A6.3 court terme + 1 A5.2 divergence) / 23 fermées | < 10 ouvertes | 🟢 |
 | PR avec revue humaine | 100% (toutes les 50+ PRs mergées via gh admin merge) | 100% | 🟢 |
 | Vélocité observée (prompts/jour) | ~14 (sprint marathon 36h) | 4–6 régime de croisière | 🟢 |
 | Incidents staging / sem | n/a (pas encore staging) | < 2 | — |
