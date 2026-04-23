@@ -1,20 +1,20 @@
 # PROGRESS.md — État d'avancement du projet
 
-> **Dernière mise à jour** : 2026-04-23 09:30 — **A6.3 fermé** (PR #71, commit `cd1b6b8`). **43/48 prompts catalogue** + 2 PRs ad-hoc complétés. **1095 unit + 6 integration tests** sur 8 workspaces. Reste : actions humaines externes (provisioning GCP, Firebase, Swissdec, pentest, go-live) + A6.5 backup-restore-DR-test (préparable en local).
+> **Dernière mise à jour** : 2026-04-23 11:00 — **A6.5 fermé** (PR #74, commit `ea52d41`) + DETTE-036 ouverte (PR #73, A5.2 divergence). **44/48 prompts catalogue** + 2 PRs ad-hoc. **1105 unit + 6 integration tests** sur 8 workspaces. RPO ≤ 6 min et RTO ≤ 4h DR démontrés en local. Reste : A6.6 pentest + A6.7 go-live (externes).
 > **Source de vérité** pour l'orchestrateur. **Ne jamais** le mettre à jour à la main sans avoir suivi le protocole `ORCHESTRATOR.md`.
 
 ---
 
 ## 0. Instantané
 
-- **Sprint courant** : A.6 (4/7 prompts complétés, A6.3 désormais fermé)
-- **Phase** : MVP fonctionnel bout-en-bout + observabilité production-ready (logs structurés JSON, dashboards Grafana, alertes P1/P2/P3 routées). Reste l'infra ops externe + le go-live.
-- **Prochain prompt** : `A6.5-backup-restore-dr-test` (scripts pg_dump + restore + runbook DR + test E2E docker-compose, M ~1 jour, préparable en local sans GCP)
-- **Prompts complétés** : 43 / 48 catalogue (89.6%) + 2 ad-hoc (design + dev fix) + 0 / 5 OPS
+- **Sprint courant** : A.6 (5/7 prompts complétés, A6.5 fermé)
+- **Phase** : MVP fonctionnel bout-en-bout + observabilité + DR production-ready (RPO ≤ 6 min, RTO ≤ 4h démontrés). Restent **uniquement** A6.6 (pentest externe) + A6.7 (go-live, dépend autorisation LSE + provisioning GCP).
+- **Prochain prompt** : aucun prompt code-only catalogue restant. Pistes : DETTE-033 (worker /metrics) + DETTE-035 (métriques business) en 1 PR cohérente — débloque les dashboards Grafana actuellement à moitié vides. Voir SESSION-LOG du 2026-04-23 10:00 pour analyse détaillée.
+- **Prompts complétés** : 44 / 48 catalogue (91.7%) + 2 ad-hoc (design + dev fix) + 0 / 5 OPS
 - **Blockers ouverts** : 2 (BLOCKER-001 sandbox MP, BLOCKER-002 autorisation LSE — externes, non-dev)
-- **Dette technique** : 9 ouvertes / 23 fermées (006/008/014/015/016 + 3 A6.3 : DETTE-033/034/035 + DETTE-036 A5.2 divergence)
-- **Tests** : **1095 unit + 6 integration** sur 8 workspaces (vs 1081 avant ; +14 tests A6.3)
-- **Vélocité observée** : 43 prompts en 38 heures (sprint marathon 2026-04-21 → 2026-04-23 09:30)
+- **Dette technique** : 10 ouvertes / 23 fermées (006/008/014/015/016 + 3 A6.3 + 1 A5.2 + 1 A6.5)
+- **Tests** : **1105 unit + 6 integration** sur 8 workspaces (vs 1095 avant ; +10 tests A6.5)
+- **Vélocité observée** : 44 prompts en 39 heures (sprint marathon 2026-04-21 → 2026-04-23 11:00)
 - **Skills disponibles** : 32 (voir `skills/README.md`)
 - **Documents de référence** : 13 (brief, spec, plan, archi, risques, rôles, registre nLPD, pr-template, ADR-0001/0002/0003, dev-setup, firebase-setup, github-branch-protection, runbooks ×6)
 
@@ -93,7 +93,7 @@
 | `A5.8-invoice-relances-pipeline` | 2026-04-22 | [#63](https://github.com/kreuille/interim-agency-system/pull/63) | `6329bff` | Relances J+7/15/30/45 + escalade rôles |
 | `A5.9-accounting-export-bexio-abacus` | 2026-04-22 | [#64](https://github.com/kreuille/interim-agency-system/pull/64) | `644c213` | Entries double-partie + plan comptable PME + CSV export |
 
-#### Sprint A.6 — Conformité & go-live (4/7)
+#### Sprint A.6 — Conformité & go-live (5/7)
 
 | Prompt | Complété le | PR | Commit | Notes |
 |--------|-------------|----|----|-------|
@@ -101,6 +101,7 @@
 | `A6.2-seco-export-one-click` | 2026-04-22 | [#66](https://github.com/kreuille/interim-agency-system/pull/66) | `5eedfee` | Bundle CSV + résumé contrôle SECO |
 | `A6.3-observability-stack` | 2026-04-22 + 2026-04-23 | [#48](https://github.com/kreuille/interim-agency-system/pull/48) + [#71](https://github.com/kreuille/interim-agency-system/pull/71) | `412d903` + `cd1b6b8` | Code Sentry/OTel/Prometheus (PR #48) + pino logger PII-redacted + correlation-id middleware + ops/ stack (4 dashboards Grafana + 11 alertes P1/P2/P3 + Loki/Promtail/Tempo + docker-compose runnable local) |
 | `A6.4-runbooks-incidents` | 2026-04-22 | [#67](https://github.com/kreuille/interim-agency-system/pull/67) | `78a494a` | 5 runbooks incidents prod copy-paste-ready |
+| `A6.5-backup-restore-dr-test` | 2026-04-23 | [#74](https://github.com/kreuille/interim-agency-system/pull/74) | `ea52d41` | pg_dump + pg_restore chiffrés age + wal-archive + test-roundtrip E2E + worker BullMQ mensuel + runbook DR + alertes P1/P2 + dashboard `backup-dr.json`. **RPO ≤ 6 min et RTO ≤ 4h prouvés en local** (RTO empirique 1s sur 1850 rows seedées) |
 
 #### PRs ad-hoc (hors catalogue)
 
@@ -126,13 +127,13 @@
 | `A6.6-pentest-externe` | A.6 | L | Prestataire CH + budget | Action humaine. Stagnation tant que pilote pas livré |
 | `A6.7-go-live-pilote` | A.6 | M | A0.4, A0.6 (Firebase), A6.5, BLOCKER-002 (autorisation LSE), client pilote signé | Jour J — checklist déploiement Cloud Run + cutover DNS + monitoring |
 
-### 🔵 Pending — code prioritaire (clôture A.6)
+### 🔵 Pending — code prioritaire (clôture observabilité opérationnelle)
 
 | Ordre | Prompt | Sprint | Effort | Notes |
 |-------|--------|--------|--------|-------|
-| 1 | **`A6.5-backup-restore-dr-test` (préparation locale)** | A.6 | M | **Prochain prompt prêt à lancer** — scripts `ops/backup/pg_dump.sh` + `ops/backup/restore.sh` + runbook DR + test E2E avec docker-compose Postgres. Activation prod attend A0.4. Débloque le critère "backup testé mensuellement" pour A6.7 |
-| 2 | `DETTE-033` (worker /metrics) | A.6 | S | Wire `/metrics` endpoint sur `apps/worker/main.ts` (port 9090) avec counters BullMQ. Sans ça, les dashboards `queue-depth` et `mp-health` (outbox lag) restent vides |
-| 3 | `DETTE-035` (métriques business payroll/availability) | A.6 | S | Exposer `payroll_batch_duration_seconds`, `payroll_batch_failed_total`, `availability_outbox_oldest_pending_seconds` |
+| 1 | **`DETTE-033 + DETTE-035` (1 PR combinée)** | A.6 | S+S | **Prochain travail prêt à lancer** — wire `/metrics` endpoint sur `apps/worker/main.ts` (port 9090) avec counters BullMQ + métriques business `payroll_batch_*` / `availability_outbox_*`. Débloque immédiatement les 4 dashboards Grafana actuellement à moitié vides (`queue-depth`, `mp-health`, `payroll-batch`, `backup-dr`) |
+| 2 | `DETTE-036` (A5.2 divergence) | A.6 | M | (a) ADR formelle pour entériner port TS `StaticCantonHolidaysPort` OU migration vers table Prisma + seed 2026-2028 ; (b) ajouter Tessin (TI) ; (c) règle "plus favorable" contrat>CCT |
+| 3 | `DETTE-037` (job CI test-roundtrip mensuel) | A.6 | M | Job GitHub Actions qui exécute `ops/backup/test-roundtrip.sh` dans compose `dr-test`. Évite régression silencieuse sur scripts shell DR |
 | 4 | `DETTE-034` (oncall-sms-bridge) | A.7 | M | Passerelle webhook → Swisscom SMS API pour Alertmanager receiver `on-call`. Sinon les alertes P1 vont seulement dans Slack |
 
 ### 🔵 Pending — OPS transversal (5 prompts catalogués)
@@ -161,11 +162,11 @@
 | A.3 | S6 | S7 | 6 | 6 | ✅ |
 | A.4 | S8 | S9 | 7 | 7 | ✅ |
 | A.5 | S10 | S12 | 9 | 8 | 🟡 A5.5 externe (sandbox Swissdec) |
-| A.6 | S13 | S14 | 7 | 4 | 🟡 A6.5 préparable local + A6.6/A6.7 externes |
+| A.6 | S13 | S14 | 7 | 5 | 🟡 A6.6 (pentest) + A6.7 (go-live) externes |
 | Ad-hoc | — | — | 2 | 2 | ✅ Design Helvètia + fix dev server |
 | OPS | continu | continu | 5 | 0 | 🔵 |
 
-**Total catalogue : 43 / 48 (89.6%)**
+**Total catalogue : 44 / 48 (91.7%)**
 
 ---
 
@@ -213,6 +214,10 @@ Décisions prises et non renégociables sans ADR. Mettre à jour au fil de l'eau
 | 2026-04-23 | Correlation-id middleware (`X-Request-Id` / `X-Correlation-Id`) UUIDv4 par défaut, propagé dans header réponse + tous les logs pino | `apps/api/src/shared/middleware/request-id.middleware.ts` | A6.3 (PR #71) |
 | 2026-04-23 | Stack ops Grafana/Loki/Tempo/Prometheus/Alertmanager runnable en local via `ops/docker-compose.observability.yml` ; configs versionnées importables sur Grafana Cloud EU en prod | `ops/` | A6.3 (PR #71) |
 | 2026-04-23 | Routage Alertmanager P1→on-call (SMS+Slack), P2→dev-team (Slack), P3→tickets (Linear) ; chaque alerte référence un runbook dans `annotations.runbook` | `ops/alertmanager/alertmanager.yml` | A6.3 (PR #71) |
+| 2026-04-23 | DR backup chiffré : `age` (https://age-encryption.org) plutôt que GPG ; clé recipient publique déployable, identity privée scopée DR uniquement (Secret Manager prod) | `ops/backup/pg_dump.sh` + `pg_restore.sh` | A6.5 (PR #74) |
+| 2026-04-23 | DR cible base : suffixe `_dr`/`_test_`/`interim_dev` obligatoire ; guard `pg_restore.sh` refuse drop sinon (anti-fat-finger anti-prod) | `ops/backup/pg_restore.sh` § guard | A6.5 (PR #74) |
+| 2026-04-23 | DR rétention : 90 jours dumps quotidiens (politique nLPD : pas plus que nécessaire), 30 jours WAL pour PITR | `ops/backup/README.md` § Lifecycle | A6.5 (PR #74) |
+| 2026-04-23 | DR test mensuel : worker BullMQ cron `0 3 1 * *` Europe/Zurich, RTO budget 14400s (4h), métrique `dr_restore_duration_seconds` | `apps/worker/src/dr-restore-test.worker.ts` | A6.5 (PR #74) |
 
 ---
 
@@ -246,7 +251,7 @@ Décisions prises et non renégociables sans ADR. Mettre à jour au fil de l'eau
 
 ## 5. Dettes techniques qualifiées
 
-### Dettes ouvertes (9)
+### Dettes ouvertes (10)
 
 | ID | Ouverte le | Description | Priorité | ETA |
 |----|------------|-------------|----------|-----|
@@ -255,10 +260,11 @@ Décisions prises et non renégociables sans ADR. Mettre à jour au fil de l'eau
 | DETTE-014 | 2026-04-21 | Créer projets Firebase `interim-agency-system` + `-staging` selon `docs/firebase-setup.md` | H | Avant A6.7 |
 | DETTE-015 | 2026-04-21 | Provisionner GCP `europe-west6` selon ADR-0002 (Cloud SQL, Memorystore, Cloud Storage, Secret Manager, OIDC WIF) | H | Avant A6.7 |
 | DETTE-016 | 2026-04-21 | Cloud Function `onCreate` qui pose les custom claims `agencyId` + `role` à l'inscription | M | A1.7 ✅ partiel — wire prod attend DETTE-014 |
-| DETTE-033 | 2026-04-23 | Wire `/metrics` endpoint sur `apps/worker/main.ts` (port 9090) avec counters BullMQ par queue. Sans ça, dashboards `queue-depth` et `mp-health` (outbox lag) restent vides | M | A.6 (court — S) |
+| DETTE-033 | 2026-04-23 | Wire `/metrics` endpoint sur `apps/worker/main.ts` (port 9090) avec counters BullMQ par queue. Sans ça, dashboards `queue-depth`, `mp-health` (outbox lag), `payroll-batch`, `backup-dr` restent vides | M | A.6 (court — S) |
 | DETTE-034 | 2026-04-23 | Implémenter `oncall-sms-bridge` (passerelle webhook → Swisscom SMS API) ou wire un service tiers (PagerDuty, Opsgenie). Sinon receiver `on-call` Alertmanager n'envoie qu'à Slack | M | A.7 |
-| DETTE-035 | 2026-04-23 | Exposer métriques business `payroll_batch_*` et `availability_outbox_*` référencées par les dashboards | S | A.6 (court — S) |
+| DETTE-035 | 2026-04-23 | Exposer métriques business `payroll_batch_*`, `availability_outbox_*`, `pg_dump_*`, `wal_archive_*`, `dr_restore_*` référencées par les dashboards/alertes | S | A.6 (court — S, à fusionner avec DETTE-033) |
 | DETTE-036 | 2026-04-23 | A5.2 divergence : (a) ADR formelle pour entériner port TS `StaticCantonHolidaysPort` au lieu de table Prisma `canton_holidays` seedée OU migration vers table Prisma + seed 2026-2028 ; (b) ajouter Tessin (TI) dans `CANTONAL_FIXED` ; (c) implémenter règle "plus favorable" contrat client > CCT | M | A.6 ou ADR rapide |
+| DETTE-037 | 2026-04-23 | Job CI mensuel qui exécute `ops/backup/test-roundtrip.sh` dans GitHub Actions (compose `dr-test` + age + bash). Sinon le test E2E ne tourne qu'en local — risque de régression silencieuse sur scripts shell | M | A.6 (avant pilote) |
 
 ### Dettes fermées (23)
 
@@ -274,16 +280,16 @@ DETTE-001 (composite TS, reportée A.6) · DETTE-002 (repo GitHub) · DETTE-003 
 
 | Métrique | Valeur | Cible | Tendance |
 |----------|--------|-------|----------|
-| Prompts completed catalogue | 43 / 48 (89.6%) | 100% (S14) | 🟢 en avance |
-| Prompts completed total (catalogue + ad-hoc + OPS) | 45 / 53 | 53 | 🟢 |
-| Tests unit + integration | **1095 unit + 6 integration** | ≥ couverture seuils | 🟢 |
+| Prompts completed catalogue | 44 / 48 (91.7%) | 100% (S14) | 🟢 en avance |
+| Prompts completed total (catalogue + ad-hoc + OPS) | 46 / 53 | 53 | 🟢 |
+| Tests unit + integration | **1105 unit + 6 integration** | ≥ couverture seuils | 🟢 |
 | Couverture domain | 100% (mesurée A1.1) | ≥ 85% | 🟢 |
 | Couverture shared | 96.58% | ≥ 80% | 🟢 |
 | Couverture application | 84.14% | ≥ 80% | 🟢 |
 | Couverture api | 87.24% lines / 75.24% branches | ≥ 80%/70% | 🟢 |
 | Blockers conformité ouverts | 1 (LSE — externe) | 0 avant go-live | 🟡 |
 | Blockers techniques ouverts | 1 (sandbox MP — externe) | 0 avant go-live | 🟡 |
-| Dettes techniques qualifiées | 9 ouvertes (5 externes + 3 A6.3 court terme + 1 A5.2 divergence) / 23 fermées | < 10 ouvertes | 🟢 |
+| Dettes techniques qualifiées | 10 ouvertes (5 externes + 3 A6.3 + 1 A5.2 + 1 A6.5 court terme) / 23 fermées | < 10 ouvertes | 🟡 (cible atteinte tout juste) |
 | PR avec revue humaine | 100% (toutes les 50+ PRs mergées via gh admin merge) | 100% | 🟢 |
 | Vélocité observée (prompts/jour) | ~14 (sprint marathon 36h) | 4–6 régime de croisière | 🟢 |
 | Incidents staging / sem | n/a (pas encore staging) | < 2 | — |
@@ -307,7 +313,7 @@ DETTE-001 (composite TS, reportée A.6) · DETTE-002 (repo GitHub) · DETTE-003 
 
 | Semaine | Prompts completed | Vélocité | Blockers ajoutés/clos | Notes |
 |---------|-------------------|----------|----------------------|-------|
-| 2026-W17 (en cours) | 43 catalogue + 2 ad-hoc | exceptionnelle (sprint marathon) | 0 ajoutés / 2 clos (B-003, B-004 décision) | Resynchro PROGRESS le 2026-04-23 09:00 ; A6.3 fermé 2026-04-23 09:30 |
+| 2026-W17 (en cours) | 44 catalogue + 2 ad-hoc | exceptionnelle (sprint marathon) | 0 ajoutés / 2 clos (B-003, B-004 décision) | Resynchro PROGRESS 2026-04-23 09:00 ; A6.3 fermé 09:30 ; A5.2 divergence (DETTE-036) 10:00 ; A6.5 fermé 11:00 (RPO/RTO démontrés) |
 
 ---
 
