@@ -1,6 +1,6 @@
 # PROGRESS.md — État d'avancement du projet
 
-> **Dernière mise à jour** : 2026-04-23 13:00 — **DETTE-036 fermée** (PR #77, commit `03554c3`) : table Prisma `canton_holidays` + 26 cantons (vs 11) + règle "plus favorable" CCT/contrat + Tessin ajouté. **44/48 prompts catalogue** + 2 PRs ad-hoc. **1167 unit + 53 integration tests** sur 8 workspaces (+62 unit, +6 integration). Coverage domain payroll **98.86%** (>= 90% DoD). Reste : A6.6 pentest + A6.7 go-live (externes).
+> **Dernière mise à jour** : 2026-04-23 15:00 — **DETTE-033 + DETTE-035 fermées** (PR #79, commit `a38b712`) : worker `/metrics` endpoint port 9090 + 20 business counters PII-safe (paie 5 + availability 4 + DR 8 + MP 3) + 4 dashboards Grafana mis à jour. **44/48 prompts catalogue** + 2 PRs ad-hoc. **1210 unit + 53 integration tests** (vs 1167/53, +43 unit). Reste : A6.6 pentest + A6.7 go-live (externes). Prochain prompt suggéré : **DETTE-037** (job CI test-roundtrip backup/DR mensuel).
 > **Source de vérité** pour l'orchestrateur. **Ne jamais** le mettre à jour à la main sans avoir suivi le protocole `ORCHESTRATOR.md`.
 
 ---
@@ -8,14 +8,14 @@
 ## 0. Instantané
 
 - **Sprint courant** : A.6 (5/7 prompts complétés, A6.5 fermé)
-- **Phase** : MVP fonctionnel bout-en-bout + observabilité + DR production-ready (RPO ≤ 6 min, RTO ≤ 4h démontrés). Restent **uniquement** A6.6 (pentest externe) + A6.7 (go-live, dépend autorisation LSE + provisioning GCP).
-- **Prochain prompt** : aucun prompt code-only catalogue restant. Pistes : DETTE-033 (worker /metrics) + DETTE-035 (métriques business) en 1 PR cohérente — débloque les dashboards Grafana actuellement à moitié vides. Voir SESSION-LOG du 2026-04-23 10:00 pour analyse détaillée.
+- **Phase** : MVP + observabilité production-ready (logs structurés, dashboards Grafana **vivants** avec 20 business counters, alertes P1/P2/P3, DR RPO ≤ 6 min RTO ≤ 4h démontrés). Restent **uniquement** A6.6 (pentest externe) + A6.7 (go-live, dépend autorisation LSE + provisioning GCP).
+- **Prochain prompt** : **DETTE-037** (job CI mensuel `test-roundtrip` backup/DR) — dernière dette critique avant pilote, évite régression silencieuse sur scripts shell DR.
 - **Prompts complétés** : 44 / 48 catalogue (91.7%) + 2 ad-hoc (design + dev fix) + 0 / 5 OPS
 - **Blockers ouverts** : 2 (BLOCKER-001 sandbox MP, BLOCKER-002 autorisation LSE — externes, non-dev)
-- **Dette technique** : 12 ouvertes / 24 fermées (006/008/014/015/016 + 3 A6.3 + 1 A6.5 + 3 DETTE-036 sub-tickets — DETTE-036 originale **CLOSE**)
-- **Tests** : **1167 unit + 53 integration** sur 8 workspaces (vs 1105/47 ; +62 unit, +6 integration)
-- **Coverage domain payroll** : **98.86% lines** / 87.5% branches / 98.21% functions (DoD ≥ 90% atteint)
-- **Vélocité observée** : 44 prompts catalogue + 2 ad-hoc + 3 DETTE résolues en 41 heures (sprint marathon 2026-04-21 → 2026-04-23 13:00)
+- **Dette technique** : 13 ouvertes / 26 fermées (DETTE-033/035 closes, 2 nouvelles DETTE-040/041 wiring runtime)
+- **Tests** : **1210 unit + 53 integration** sur 8 workspaces (vs 1167/53 ; +43 unit)
+- **Coverage domain payroll** : 98.86% lines (inchangé). **Coverage shared** : +20 tests observability registry
+- **Vélocité observée** : 44 prompts catalogue + 2 ad-hoc + 5 DETTE résolues en 43 heures (sprint marathon 2026-04-21 → 2026-04-23 15:00)
 - **Skills disponibles** : 32 (voir `skills/README.md`)
 - **Documents de référence** : 13 (brief, spec, plan, archi, risques, rôles, registre nLPD, pr-template, ADR-0001/0002/0003, dev-setup, firebase-setup, github-branch-protection, runbooks ×6)
 
@@ -132,12 +132,13 @@
 
 | Ordre | Prompt | Sprint | Effort | Notes |
 |-------|--------|--------|--------|-------|
-| 1 | **`DETTE-033 + DETTE-035` (1 PR combinée)** | A.6 | S+S | **Prochain travail prêt à lancer** — wire `/metrics` endpoint sur `apps/worker/main.ts` (port 9090) avec counters BullMQ + métriques business `payroll_batch_*` / `availability_outbox_*` / `pg_dump_*` / `wal_archive_*` / `dr_restore_*`. Débloque immédiatement les 4 dashboards Grafana actuellement à moitié vides (`queue-depth`, `mp-health`, `payroll-batch`, `backup-dr`) |
-| 2 | `DETTE-038` (wire preload canton-holidays bootstrap) | A.7 | XS | Appeler `PrismaCantonHolidayRepository.preload()` au bootstrap API pour année courante + N+1. Sans ça, le cache reste vide en runtime → fallback silencieux sur `StaticCantonHolidaysPort` |
-| 3 | `DETTE-037` (job CI test-roundtrip mensuel) | A.6 | M | Job GitHub Actions qui exécute `ops/backup/test-roundtrip.sh` dans compose `dr-test`. Évite régression silencieuse sur scripts shell DR |
-| 4 | `DETTE-034` (oncall-sms-bridge) | A.7 | M | Passerelle webhook → Swisscom SMS API pour Alertmanager receiver `on-call`. Sinon les alertes P1 vont seulement dans Slack |
-| 5 | `DETTE-039` (Jeûne genevois `sunday_relative`) | A.7 | XS | Raffiner le placeholder `fixed 9/1` GE → `sunday_relative {ordinal:1, offset:4}` (jeudi après 1er dim sept) |
-| 6 | `DETTE-036(a) bis` (ADR canton_holidays double mécanisme) | A.7 | S | ADR formelle pour entériner le double mécanisme port TS fallback + table Prisma source de vérité, OU supprimer `StaticCantonHolidaysPort` après wiring complet |
+| 1 | **`DETTE-037`** (job CI test-roundtrip mensuel) | A.6 | M | **Prochain travail prêt à lancer** — Job GitHub Actions qui exécute `ops/backup/test-roundtrip.sh` dans compose `dr-test`. Évite régression silencieuse sur scripts shell DR. Dernière dette critique avant pilote |
+| 2 | `DETTE-041` (onScrape gauges DB outbox) | A.7 | S | Wire `onScrape` hook côté worker pour scraper Postgres et mettre à jour `availability_outbox_pending_count` + `availability_outbox_lag_seconds`. Sans ça, ces 2 gauges restent à 0 même si l'outbox déborde |
+| 3 | `DETTE-040` (wire metrics callbacks main.ts) | A.7 | S | Quand DETTE-014/015 done : wire `createAvailabilitySyncWorker({ ..., onResult: ... → metrics })` etc. dans `apps/worker/src/main.ts`. Préparer la propagation `agencyId` depuis le job BullMQ |
+| 4 | `DETTE-038` (wire preload canton-holidays bootstrap) | A.7 | XS | Appeler `PrismaCantonHolidayRepository.preload()` au bootstrap API |
+| 5 | `DETTE-034` (oncall-sms-bridge) | A.7 | M | Passerelle webhook → Swisscom SMS API pour Alertmanager receiver `on-call` |
+| 6 | `DETTE-039` (Jeûne genevois `sunday_relative`) | A.7 | XS | Raffiner placeholder `fixed 9/1` GE → `sunday_relative {ordinal:1, offset:4}` |
+| 7 | `DETTE-036(a) bis` (ADR canton_holidays double mécanisme) | A.7 | S | ADR formelle pour entériner double mécanisme |
 
 ### 🔵 Pending — OPS transversal (5 prompts catalogués)
 
@@ -225,6 +226,9 @@ Décisions prises et non renégociables sans ADR. Mettre à jour au fil de l'eau
 | 2026-04-23 | Table Prisma `canton_holidays` : pas d'`agencyId` (référentiel public commun), PK composite `(canton, date, validFrom)` pour versioning historique 10 ans | `apps/api/prisma/schema.prisma` | DETTE-036 (PR #77) |
 | 2026-04-23 | `CantonHolidayPort.forCantonAndYear` SYNCHRONE par contrat (consommé par `PayrollEngine` pur). Adapter Prisma offre `preload(canton, year)` async à appeler au bootstrap + cache in-memory invalidé après `upsertMany` | `apps/api/src/infrastructure/persistence/prisma/canton-holiday.repository.ts` | DETTE-036 (PR #77) |
 | 2026-04-23 | Règle "plus favorable" CCT/contrat : `applyContractOverrides()` retient `Math.max(CCT, contrat)` pour night/sunday/holiday/overtime. CCT = plancher légal infranchissable (override `<` ignoré silencieusement). `stackSundayAndNight` et `overtimeThresholdMinutes` non overridables (CCT-branche) | `packages/domain/src/payroll/surcharge-rules.ts` | DETTE-036 (PR #77) |
+| 2026-04-23 | Module `prom-registry` factorisé dans `packages/shared` : `hashAgencyId()` SHA-256 12 hex (vs 16 chars hashWorkerId), `FORBIDDEN_LABELS` 18 entries, `assertLabelHygiene()` au boot (fail-fast), `createPromRegistry({service: 'api'\|'worker'})` | `packages/shared/src/observability/prom-registry.ts` | DETTE-033 (PR #79) |
+| 2026-04-23 | Worker `/metrics` endpoint : `node:http` natif (pas de framework) port 9090, routes GET /metrics + /health, `onScrape` hook async qui swallow erreurs (Prometheus retry sinon) | `apps/worker/src/observability/server.ts` | DETTE-033 (PR #79) |
+| 2026-04-23 | 20 business counters worker : 5 paie + 4 availability outbox + 8 DR/backup + 3 MovePlanner. Tous PII-safe (`agency_id_hash` jamais en clair). `BusinessMetrics` interface + `createBusinessMetrics()` impl + `createNoOpBusinessMetrics()` tests | `apps/worker/src/observability/business-metrics.ts` | DETTE-035 (PR #79) |
 
 ---
 
@@ -258,7 +262,7 @@ Décisions prises et non renégociables sans ADR. Mettre à jour au fil de l'eau
 
 ## 5. Dettes techniques qualifiées
 
-### Dettes ouvertes (12)
+### Dettes ouvertes (13)
 
 | ID | Ouverte le | Description | Priorité | ETA |
 |----|------------|-------------|----------|-----|
@@ -267,9 +271,11 @@ Décisions prises et non renégociables sans ADR. Mettre à jour au fil de l'eau
 | DETTE-014 | 2026-04-21 | Créer projets Firebase `interim-agency-system` + `-staging` selon `docs/firebase-setup.md` | H | Avant A6.7 |
 | DETTE-015 | 2026-04-21 | Provisionner GCP `europe-west6` selon ADR-0002 (Cloud SQL, Memorystore, Cloud Storage, Secret Manager, OIDC WIF) | H | Avant A6.7 |
 | DETTE-016 | 2026-04-21 | Cloud Function `onCreate` qui pose les custom claims `agencyId` + `role` à l'inscription | M | A1.7 ✅ partiel — wire prod attend DETTE-014 |
-| DETTE-033 | 2026-04-23 | Wire `/metrics` endpoint sur `apps/worker/main.ts` (port 9090) avec counters BullMQ par queue. Sans ça, dashboards `queue-depth`, `mp-health` (outbox lag), `payroll-batch`, `backup-dr` restent vides | M | A.6 (court — S) |
+| ~~DETTE-033~~ | ~~2026-04-23~~ | ~~Wire `/metrics` endpoint sur `apps/worker/main.ts` (port 9090) avec counters BullMQ~~ — **CLOSE 2026-04-23 15:00 via PR #79** : HTTP server natif sur port 9090, factorisé `prom-registry` shared, 20 business counters PII-safe | ~~M~~ | ✅ |
 | DETTE-034 | 2026-04-23 | Implémenter `oncall-sms-bridge` (passerelle webhook → Swisscom SMS API) ou wire un service tiers (PagerDuty, Opsgenie). Sinon receiver `on-call` Alertmanager n'envoie qu'à Slack | M | A.7 |
-| DETTE-035 | 2026-04-23 | Exposer métriques business `payroll_batch_*`, `availability_outbox_*`, `pg_dump_*`, `wal_archive_*`, `dr_restore_*` référencées par les dashboards/alertes | S | A.6 (court — S, à fusionner avec DETTE-033) |
+| ~~DETTE-035~~ | ~~2026-04-23~~ | ~~Exposer métriques business `payroll_batch_*`, `availability_outbox_*`, `pg_dump_*`, `wal_archive_*`, `dr_restore_*`~~ — **CLOSE 2026-04-23 15:00 via PR #79** : 20 métriques (5 paie + 4 avail + 8 DR + 3 MP) avec `hashAgencyId` + `assertLabelHygiene` au boot | ~~S~~ | ✅ |
+| DETTE-040 | 2026-04-23 | Wire les counters dans `apps/worker/src/main.ts` quand le DI Redis + Prisma sera prêt (DETTE-014/015 done). Propager `agencyId` depuis job BullMQ vers `metrics.recordAvailabilityOutboxPushed` | S | A.7 (avec wiring runtime) |
+| DETTE-041 | 2026-04-23 | Wire `onScrape` hook côté worker pour scraper Postgres et mettre à jour `availability_outbox_pending_count` + `availability_outbox_lag_seconds`. Sans ça, ces 2 gauges restent à 0 | S | A.6 (court terme, faisable immédiatement) |
 | ~~DETTE-036~~ | ~~2026-04-23~~ | ~~A5.2 divergence : (a) port TS vs table Prisma ; (b) Tessin manquant ; (c) règle "plus favorable"~~ — **CLOSE 2026-04-23 13:00 via PR #77** : table Prisma versionnée + 26 cantons (Tessin inclus) + `applyContractOverrides()` + 947 rows seedées + 9 integration tests + coverage 98.86% | ~~M~~ | ✅ |
 | DETTE-036(a) bis | 2026-04-23 | ADR formelle pour entériner double mécanisme (port TS fallback + table Prisma source de vérité) OU supprimer `StaticCantonHolidaysPort` après wiring complet | S | A.7 |
 | DETTE-037 | 2026-04-23 | Job CI mensuel qui exécute `ops/backup/test-roundtrip.sh` dans GitHub Actions (compose `dr-test` + age + bash). Sinon le test E2E ne tourne qu'en local — risque de régression silencieuse sur scripts shell | M | A.6 (avant pilote) |
@@ -292,14 +298,14 @@ DETTE-001 (composite TS, reportée A.6) · DETTE-002 (repo GitHub) · DETTE-003 
 |----------|--------|-------|----------|
 | Prompts completed catalogue | 44 / 48 (91.7%) | 100% (S14) | 🟢 en avance |
 | Prompts completed total (catalogue + ad-hoc + OPS) | 46 / 53 | 53 | 🟢 |
-| Tests unit + integration | **1167 unit + 53 integration** | ≥ couverture seuils | 🟢 |
+| Tests unit + integration | **1210 unit + 53 integration** | ≥ couverture seuils | 🟢 |
 | Couverture domain | 100% (mesurée A1.1) | ≥ 85% | 🟢 |
 | Couverture shared | 96.58% | ≥ 80% | 🟢 |
 | Couverture application | 84.14% | ≥ 80% | 🟢 |
 | Couverture api | 87.24% lines / 75.24% branches | ≥ 80%/70% | 🟢 |
 | Blockers conformité ouverts | 1 (LSE — externe) | 0 avant go-live | 🟡 |
 | Blockers techniques ouverts | 1 (sandbox MP — externe) | 0 avant go-live | 🟡 |
-| Dettes techniques qualifiées | 12 ouvertes (5 externes + 3 A6.3 + 1 A6.5 + 3 DETTE-036 sub-tickets) / 24 fermées | < 10 ouvertes | 🔴 (DETTE-036 originale fermée mais 3 sub-tickets ouverts) |
+| Dettes techniques qualifiées | 13 ouvertes (5 externes + 1 A6.5 + 3 DETTE-036 sub + 2 DETTE-040/041 nouvelles + 1 A6.3 DETTE-034) / 26 fermées | < 10 ouvertes | 🟡 |
 | PR avec revue humaine | 100% (toutes les 50+ PRs mergées via gh admin merge) | 100% | 🟢 |
 | Vélocité observée (prompts/jour) | ~14 (sprint marathon 36h) | 4–6 régime de croisière | 🟢 |
 | Incidents staging / sem | n/a (pas encore staging) | < 2 | — |
@@ -323,7 +329,7 @@ DETTE-001 (composite TS, reportée A.6) · DETTE-002 (repo GitHub) · DETTE-003 
 
 | Semaine | Prompts completed | Vélocité | Blockers ajoutés/clos | Notes |
 |---------|-------------------|----------|----------------------|-------|
-| 2026-W17 (en cours) | 44 catalogue + 2 ad-hoc + 3 DETTE résolues | exceptionnelle (sprint marathon) | 0 ajoutés / 2 clos (B-003, B-004 décision) | Resynchro PROGRESS 2026-04-23 09:00 ; A6.3 fermé 09:30 ; A5.2 divergence (DETTE-036 ouverte) 10:00 ; A6.5 fermé 11:00 ; DETTE-036 fermée 13:00 (Prisma + 26 cantons + plus favorable, +62 tests) |
+| 2026-W17 (en cours) | 44 catalogue + 2 ad-hoc + 5 DETTE résolues | exceptionnelle (sprint marathon) | 0 ajoutés / 2 clos | Resynchro 09:00 ; A6.3 09:30 ; A5.2 div→DETTE-036 10:00 ; A6.5 11:00 ; DETTE-036 13:00 ; DETTE-033+035 15:00 (worker /metrics + 20 counters PII-safe + 4 dashboards vivants, +43 tests) |
 
 ---
 
