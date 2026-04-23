@@ -6,14 +6,15 @@
 
 ## Catalogue
 
-| Runbook | Sévérité initiale | Temps de résolution cible |
-|---------|-------------------|---------------------------|
-| [mp-unreachable.md](mp-unreachable.md) | 🟠 high | < 30 min |
-| [webhook-storm.md](webhook-storm.md) | 🔴 critical | < 15 min |
-| [payroll-batch-failed.md](payroll-batch-failed.md) | 🔴 critical | < 1 h (avant exécution paie) |
-| [secret-leaked.md](secret-leaked.md) | 🔴 critical | rotation immédiate |
-| [database-down.md](database-down.md) | 🔴 critical | < 30 min |
-| [payment-file-rejected.md](payment-file-rejected.md) | 🟠 high | < 4 h (avant prochain batch banque) |
+| Runbook | Sévérité initiale | Temps de résolution cible | Dashboard Grafana lié |
+|---------|-------------------|---------------------------|----------------------|
+| [mp-unreachable.md](mp-unreachable.md) | 🟠 high | < 30 min | [`mp-health`](../../ops/grafana/dashboards/mp-health.json) |
+| [webhook-storm.md](webhook-storm.md) | 🔴 critical | < 15 min | [`mp-health`](../../ops/grafana/dashboards/mp-health.json) |
+| [payroll-batch-failed.md](payroll-batch-failed.md) | 🔴 critical | < 1 h (avant exécution paie) | [`payroll-batch`](../../ops/grafana/dashboards/payroll-batch.json) |
+| [secret-leaked.md](secret-leaked.md) | 🔴 critical | rotation immédiate | — |
+| [database-down.md](database-down.md) | 🔴 critical | < 30 min | [`api-health`](../../ops/grafana/dashboards/api-health.json) |
+| [payment-file-rejected.md](payment-file-rejected.md) | 🟠 high | < 4 h (avant prochain batch banque) | — |
+| [disaster-recovery.md](disaster-recovery.md) | 🔴 critical | RPO 15 min, RTO 4h | [`backup-dr`](../../ops/grafana/dashboards/backup-dr.json) |
 
 ## Conventions générales
 

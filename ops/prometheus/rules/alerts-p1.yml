@@ -66,3 +66,43 @@ groups:
         annotations:
           summary: 'Queue BullMQ {{ $labels.queue }} a {{ $value }} jobs en attente'
           runbook: "Scaler les workers ; vérifier qu'aucun job ne plante en boucle (DLQ)"
+
+  - name: backup-disaster-recovery
+    interval: 1m
+    rules:
+      # Aucun pg_dump réussi depuis > 25h — RPO compromis
+      - alert: PgDumpStale
+        expr: time() - pg_dump_last_success_timestamp > 90000
+        for: 5m
+        labels:
+          severity: P1
+          service: backup
+        annotations:
+          summary: 'Aucun pg_dump réussi depuis > 25h ({{ $value | humanizeDuration }})'
+          runbook: 'docs/runbooks/disaster-recovery.md §1 Préconditions'
+          impact: 'RPO compromis — la prochaine restauration perdrait > 24h de données'
+
+      # Test DR mensuel a échoué (script exit non-zéro)
+      - alert: DrRoundtripFailed
+        expr: increase(dr_restore_failures_total[35d]) > 0
+        labels:
+          severity: P1
+          service: backup
+          domain: dr
+        annotations:
+          summary: 'Test DR mensuel échoué'
+          runbook: 'docs/runbooks/disaster-recovery.md §3'
+          impact: 'Backups potentiellement non-restaurables — investiguer immédiatement'
+
+      # WAL archiving cassé : > 5 échecs en 1h — PITR compromis
+      - alert: WalArchiveFailing
+        expr: increase(wal_archive_failures_total[1h]) > 5
+        for: 5m
+        labels:
+          severity: P1
+          service: backup
+          domain: dr
+        annotations:
+          summary: '{{ $value }} échecs wal-archive sur la dernière heure'
+          runbook: 'docs/runbooks/disaster-recovery.md §1 Préconditions'
+          impact: "PITR compromis — perte data possible jusqu'au dernier WAL réussi"

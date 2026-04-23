@@ -84,3 +84,18 @@ groups:
         annotations:
           summary: 'Webhook HMAC failure rate > 10% ({{ $value | humanizePercentage }})'
           runbook: 'Vérifier rotation secret HMAC côté MovePlanner ; sinon investiguer logs sécurité (origines suspectes)'
+
+  - name: backup-rto-warning
+    interval: 1m
+    rules:
+      # Test DR mensuel : RTO > 4h (DoD A6.5)
+      - alert: DrRestoreRtoBreached
+        expr: dr_restore_duration_seconds > 14400
+        labels:
+          severity: P2
+          service: backup
+          domain: dr
+        annotations:
+          summary: 'Dernier test DR : RTO {{ $value | humanizeDuration }} > 4h'
+          runbook: 'docs/runbooks/disaster-recovery.md §6 Métriques'
+          impact: 'SLA pilote interne : 4h. Si > 4h en prod, communication client requise.'

@@ -26,3 +26,8 @@ Thumbs.db
 # Design bundles téléchargés depuis Claude Design (utilisés en lecture pour
 # produire les PR de design ; jamais committés tels quels).
 .design-tmp/
+
+# Clés age générées localement pour tester le roundtrip backup/restore.
+# La clé identity est PRIVÉE — JAMAIS committer.
+# Voir ops/backup/README.md § Préparation locale.
+ops/backup/test-keys/

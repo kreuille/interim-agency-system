@@ -1,0 +1,132 @@
+{
+  "uid": "backup-dr",
+  "title": "Backup & DR — santé sauvegardes",
+  "tags": ["interim", "backup", "dr"],
+  "timezone": "Europe/Zurich",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "1m",
+  "time": { "from": "now-30d", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Dernier pg_dump réussi",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "uid": "prometheus", "type": "prometheus" },
+      "targets": [{ "expr": "time() - pg_dump_last_success_timestamp", "refId": "A" }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 86400 },
+              { "color": "red", "value": 90000 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Taille dernier dump (compressé+chiffré)",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "uid": "prometheus", "type": "prometheus" },
+      "targets": [{ "expr": "max(pg_dump_size_bytes)", "refId": "A" }],
+      "fieldConfig": { "defaults": { "unit": "bytes" } }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "WAL archive failures (1h)",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "uid": "prometheus", "type": "prometheus" },
+      "targets": [{ "expr": "increase(wal_archive_failures_total[1h])", "refId": "A" }],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "RTO empirique (dernier test DR)",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "uid": "prometheus", "type": "prometheus" },
+      "targets": [{ "expr": "max(dr_restore_duration_seconds)", "refId": "A" }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 7200 },
+              { "color": "red", "value": 14400 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "pg_dump : taille du dump quotidien (30 jours)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "datasource": { "uid": "prometheus", "type": "prometheus" },
+      "targets": [
+        { "expr": "max(pg_dump_size_bytes)", "refId": "A", "legendFormat": "size (bytes)" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "bytes" } }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Test DR : RTO empirique (12 derniers tests mensuels)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "datasource": { "uid": "prometheus", "type": "prometheus" },
+      "targets": [
+        { "expr": "max(dr_restore_duration_seconds)", "refId": "A", "legendFormat": "RTO (s)" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 7200 },
+              { "color": "red", "value": 14400 }
+            ]
+          },
+          "custom": { "thresholdsStyle": { "mode": "line+area" } }
+        }
+      }
+    },
+    {
+      "id": 20,
+      "type": "logs",
+      "title": "Logs backup (events pg_dump.completed / pg_restore.completed / dr_roundtrip.completed)",
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 12 },
+      "datasource": { "uid": "loki", "type": "loki" },
+      "targets": [
+        {
+          "expr": "{service=~\"api|worker\"} |~ \"pg_dump.completed|pg_restore.completed|dr_roundtrip.completed\"",
+          "refId": "A"
+        }
+      ],
+      "options": { "showTime": true, "wrapLogMessage": true, "sortOrder": "Descending" }
+    }
+  ]
+}

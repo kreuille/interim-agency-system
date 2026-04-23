@@ -1,0 +1,40 @@
+# Stack DR test — Postgres cible "_dr" pour valider le roundtrip
+# backup → restore en local sans toucher la base interim_dev.
+#
+# Usage :
+#   # Démarre la base source (interim_dev) + cible DR (interim_dr)
+#   docker compose -f docker-compose.yml -f ops/docker-compose.dr-test.yml up -d postgres postgres-dr
+#
+#   # Lance le test E2E
+#   AGE_RECIPIENT=$(cat ops/backup/test-keys/recipient.txt) \
+#   AGE_IDENTITY_FILE=ops/backup/test-keys/identity.txt \
+#   ./ops/backup/test-roundtrip.sh
+#
+# Le service `postgres-dr` est sur le port 5433 pour ne pas entrer en
+# conflit avec la base de dev existante (5432).
+
+name: interim
+
+services:
+  postgres-dr:
+    image: postgres:16-alpine
+    container_name: interim-postgres-dr
+    ports:
+      - '5433:5432'
+    environment:
+      POSTGRES_USER: dev
+      POSTGRES_PASSWORD: dev
+      POSTGRES_DB: interim_dr
+    volumes:
+      - postgres_dr_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U dev -d interim_dr']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    labels:
+      com.docker.compose.project: interim
+      role: dr-target
+
+volumes:
+  postgres_dr_data:
