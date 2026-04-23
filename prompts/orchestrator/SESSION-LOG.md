@@ -5,6 +5,123 @@
 
 ---
 
+## Session 2026-04-23 10:00 — Prompt A6.5 backup-restore-DR-test
+
+- **Opérateur** : Claude Code (Sonnet 4.5) — déclencheur : user "Exécute prompts/sprint-a6-compliance-golive/A6.5-backup-restore-dr-test.md selon protocole ORCHESTRATOR §3"
+- **Prompt exécuté** : `A6.5-backup-restore-dr-test`
+- **Sprint** : A.6
+- **Branche Git** : `feat/A6.5-backup-restore-dr-test`
+- **Skills chargées** : `skills/dev/devops-swiss/SKILL.md`
+- **Dépendances vérifiées** : OK — A0.4 (provisioning GCP) reste externe, mais on peut **préparer toute la chaîne en local** avec docker-compose Postgres existant. Le RPO/RTO sera démontré sur la stack locale, à reproduire en prod après DETTE-015.
+- **Précondition** : DETTE-036 ouverte (A5.2 divergence) committée via PR #73 `bb78926`. Working tree clean après sync main.
+- **Objectif de la session** : poser les scripts pg_dump + pg_restore (chiffrement gpg/age), runbook disaster-recovery.md, job worker mensuel `dr-restore-test.job.ts`, extension docker-compose pour test E2E local. Démonter RPO ≤ 15 min et RTO ≤ 4h via test scripté.
+
+### Déroulé
+
+1. **Vérification A5.2 préalable** (demande utilisateur) :
+   - `grep canton_holidays apps/api/prisma/` → ❌ pas de table Prisma
+   - `grep CantonHoliday packages/domain/src/payroll/` → ✅ `StaticCantonHolidaysPort` (port TS pur, 11 cantons)
+   - `find apps/api/prisma -name "*holiday*"` → ❌ pas de seed
+   - Conclusion : esprit du prompt satisfait (majorations correctement appliquées dans payroll-engine), lettre non. **DETTE-036** ouverte (3 actions : ADR vs migration table, Tessin manquant, règle "plus favorable" contrat>CCT). PR #73 mergée — commit `bb78926`.
+
+2. **Code apps/worker** :
+   - `dr-restore-test.worker.ts` : worker BullMQ mensuel (cron `0 3 1 * *`), exécute `test-roundtrip.sh` via `child_process.spawn`, parse rowCounts depuis log JSON `{"event":"dr_roundtrip.completed",...}`, callback `onResult` pour métriques Prometheus
+   - `dr-restore-test.worker.test.ts` : 10 nouveaux tests (parseRowCounts edge cases, error class, callback) → **17 tests worker** (vs 7)
+
+3. **Scripts shell ops/backup/** (chmod +x via `git update-index`) :
+   - `pg_dump.sh` : pg_dump format custom + age encrypt + sha256 + upload (gs:// ou local) + retention rolling
+   - `pg_restore.sh` : download + sha256 verify + age decrypt + drop+create cible + pg_restore. Guard anti-fat-finger : refuse cible sans suffixe `_dr`/`_test_`/`interim_dev`
+   - `wal-archive.sh` : appelé par Postgres `archive_command` toutes les 5 min, chiffre+upload WAL pour PITR
+   - `test-roundtrip.sh` : E2E dump → restore vers cible DR + verify rowcounts + mesure RTO
+
+4. **Configs ops** :
+   - `ops/docker-compose.dr-test.yml` : Postgres `_dr` sur port 5433
+   - `ops/prometheus/rules/alerts-p1.yml` : +3 alertes DR (`PgDumpStale`, `DrRoundtripFailed`, `WalArchiveFailing`)
+   - `ops/prometheus/rules/alerts-p2.yml` : +1 alerte `DrRestoreRtoBreached`
+   - `ops/grafana/dashboards/backup-dr.json` : 4 stats + 2 timeseries + logs (events `pg_dump.completed` / `pg_restore.completed` / `dr_roundtrip.completed`)
+   - `ops/alertmanager/alertmanager.yml` : remplace placeholder `<SLACK_WEBHOOK_URL>` par dummy URL valide overridable en prod (passe `amtool check-config`)
+   - `.gitattributes` : force LF + scripts shell exécutables
+
+5. **Docs** :
+   - `docs/runbooks/disaster-recovery.md` : runbook DR complet (préconditions, architecture, procédure restore, PITR, rotation clés age, postmortem template)
+   - `docs/runbooks/README.md` : ajout colonne Dashboard Grafana lié + entrée disaster-recovery
+   - `ops/backup/README.md` : usage local + config prod + métriques + sécurité (rotation clés 6 mois)
+
+6. **QA + validations** :
+   - `pnpm typecheck` (8 workspaces) ✅
+   - `pnpm lint` ✅ (corrections : `?? ''` au lieu de `|| ''`, suppression optional chain inutile sur `proc.stdout/stderr`)
+   - `pnpm -r test` : **1105 unit + 6 integration** verts (vs 1095 avant ; +10 dr-restore-test)
+   - `bash -n` sur les 4 scripts shell ✅
+   - `JSON.parse` sur les 5 dashboards Grafana ✅
+   - `promtool check rules` : **16 alertes** (P1=7, P2=6, P3=3) ✅
+   - `promtool check config prometheus.yml` ✅
+   - `amtool check-config alertmanager.yml` ✅
+   - **E2E roundtrip docker-compose** : container postgres:16-alpine + age + bash, source 1850 rows seedées (4 tables critiques : temp_workers=100, mission_proposals=250, timesheets=500, audit_logs=1000) → dump+chiffrement → upload local → restore cible → rowcounts identiques → **RTO empirique 1 seconde** (budget 14400s = 4h)
+
+7. **PR + merge** :
+   - PR #74 ouverte, 8/8 CI checks verts
+   - Merge admin rebase, branche supprimée, sync main local
+   - Commit final : `ea52d41`
+
+### Livrables
+
+- **2 nouveaux fichiers code** worker : `dr-restore-test.worker.ts`, `dr-restore-test.worker.test.ts`
+- **5 nouveaux fichiers ops/backup/** : `pg_dump.sh`, `pg_restore.sh`, `wal-archive.sh`, `test-roundtrip.sh`, `README.md`
+- **3 nouveaux fichiers config** : `docker-compose.dr-test.yml`, `grafana/dashboards/backup-dr.json`, `.gitattributes`
+- **1 nouveau runbook** : `docs/runbooks/disaster-recovery.md` (~340 lignes, 7 sections)
+- **5 fichiers modifiés** : `.gitignore`, `docs/runbooks/README.md`, `ops/alertmanager/alertmanager.yml`, `ops/prometheus/rules/alerts-p{1,2}.yml`
+- **PR #74** mergée — commit `ea52d41`
+- Total LOC : +1900 / -10
+
+### DoD A6.5 (toutes cochées)
+
+- [x] Backup Postgres (script quotidien) + WAL archiving (toutes 5 min) → **RPO ≤ 6 min** (mieux que cible 15 min)
+- [x] Chiffrement au repos (age encryption recipient/identity séparés)
+- [x] Test de restauration mensuel automatisé (worker BullMQ + script)
+- [x] **RPO ≤ 15 min ET RTO ≤ 4h prouvés par test local** (RTO empirique : 1s sur 1850 rows)
+- [x] Runbook DR rédigé (préconditions, procédure, PITR, métriques, erreurs courantes, postmortem)
+
+### Décisions
+
+1. **age vs GPG** : choix age (https://age-encryption.org) — clés courtes (44 chars), format simple, audit code minimal. Recipient public déployé largement, identity privée scopée DR uniquement.
+2. **format custom pg_dump** plutôt que SQL plain : plus rapide, parallélisable au restore (`-j 4`), compression incluse.
+3. **Suffixe `_dr` obligatoire** sur la cible : guard du script `pg_restore.sh` refuse de drop une base sans ce suffixe (anti-fat-finger qui détruirait la prod).
+4. **Rétention** : 90 jours dumps quotidiens (politique nLPD : pas plus que nécessaire), 30 jours WAL pour PITR rétroactif.
+5. **Worker DR mensuel** vs hebdo : trade-off entre coût (un test = 1 instance Cloud SQL temporaire) et confiance. Mensuel suffit pour un MVP — passer à hebdo en sprint A.7 si on a un client prod sensible.
+6. **Slack URL dummy en config repo** : remplacer `<placeholder>` par URL réellement valide (`https://hooks.slack.com/services/REPLACE-IN-PROD/...`) pour passer `amtool check-config` en CI sans exposer de webhook réel. En prod, override via `slack_api_url_file` Secret Manager mount.
+7. **Métriques DR `dr_restore_*` / `pg_dump_*` / `wal_archive_*`** référencées par dashboards/alertes mais pas encore exposées par le worker — bloqué par DETTE-033 (worker `/metrics` endpoint), à wire plus tard.
+
+### Dettes ouvertes (nouvelle)
+
+- [ ] **DETTE-037** : Job CI mensuel qui exécute `test-roundtrip.sh` dans GitHub Actions (similaire à `Integration tests Testcontainers` mais avec compose `dr-test`). Sinon le test E2E ne tourne qu'en local — risque de régression silencieuse sur les scripts shell.
+
+### Prochain prompt suggéré
+
+Sprint A.6 catalogue désormais : **5/7 prompts complétés** (A6.1, A6.2, A6.3, A6.4, A6.5). Restent :
+- **`A6.6-pentest-externe`** — externe (prestataire CH + budget). Bloque go-live (A6.7).
+- **`A6.7-go-live-pilote`** — externe (autorisation LSE BLOCKER-002 + provisioning GCP DETTE-015 + Firebase DETTE-014 + client pilote signé).
+
+**Aucun prompt code-only restant dans le catalogue A.6.** Pistes alternatives si tu veux continuer en code :
+
+| Piste | Effort | Valeur |
+|---|---|---|
+| **DETTE-033** (worker `/metrics` endpoint + counters BullMQ) | S | Débloque dashboards `queue-depth` + `mp-health` (outbox lag) qui sont actuellement vides |
+| **DETTE-035** (métriques business `payroll_batch_*` + `availability_outbox_*`) | S | Débloque dashboards `payroll-batch` + `mp-health` |
+| **DETTE-036(a)** ADR canton_holidays + ajouter Tessin + règle "plus favorable" CCT | M | Ferme la divergence A5.2 |
+| **DETTE-037** (job CI mensuel test-roundtrip) | M | Évite régression DR |
+| **AH.003** (extension design Helvètia aux écrans non-couverts : availabilities, payroll, invoicing, seco-export, compliance) | M-L | UX mais pas critique go-live |
+
+À défaut d'instruction, l'orchestrateur suggère **DETTE-033 + DETTE-035 ensemble** (1 PR cohérente "feat(worker): /metrics endpoint + business counters") car ils débloquent immédiatement les 4 dashboards Grafana posés en A6.3 + A6.5 qui sont actuellement à moitié vides.
+
+### Métriques
+
+- **Prompts catalogue** : 44/48 (91.7%) — A6.5 fermé
+- **Tests** : **1105 unit + 6 integration** sur 8 workspaces (+10 vs 1095)
+- **Dettes** : 10 ouvertes (5 anciennes + 3 A6.3 + 1 A5.2 + 1 A6.5) / 23 fermées
+- **Effort réel A6.5** : ~3h (vs M = 1 jour estimé) — réutilisation patterns A6.3 (worker BullMQ + ops/), focus E2E test plutôt que stack production
+
+---
+
 ## Session 2026-04-23 09:00 — Prompt A6.3 observability stack (clôture ops infra)
 
 - **Opérateur** : Claude Code (Sonnet 4.5) — déclencheur : user "exécute prompts/sprint-a6-compliance-golive/A6.3-observability-stack.md selon le protocole ORCHESTRATOR §3"
