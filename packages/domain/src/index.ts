@@ -31,6 +31,7 @@ export * from './timesheets/timesheet.js';
 export * from './timesheets/timesheet-repository.js';
 export * from './payroll/surcharge-rules.js';
 export * from './payroll/canton-holidays.js';
+export * from './payroll/canton-holidays-data.js';
 export * from './payroll/payroll-line.js';
 export * from './payroll/payroll-errors.js';
 export * from './payroll/payroll-engine.js';

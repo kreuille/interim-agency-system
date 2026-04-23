@@ -133,3 +133,53 @@ export function combinedSurchargeBp(
   if (hasOvertime) base += rules.overtimeBp;
   return base;
 }
+
+/**
+ * Overrides contractuels optionnels fournis par le contrat client. Chaque
+ * champ est **indépendant** : si fourni, on compare à la règle CCT/LTr
+ * et on retient le MAX (règle "plus favorable au travailleur", principe
+ * CCT §2 + LTr art. 17b/19/20a).
+ *
+ * Exemples :
+ * - Contrat dit nuit +30% alors que CCT dit +25% → on applique 30% (plus favorable au worker)
+ * - Contrat dit nuit +20% alors que CCT/LTr imposent +25% → on applique 25% (CCT/LTr = plancher)
+ *
+ * Les basis points sont en valeur positive absolue (2500 = +25%).
+ * `undefined` = pas d'override, on utilise la règle CCT telle quelle.
+ */
+export interface ContractSurchargeOverrides {
+  readonly nightBp?: number;
+  readonly sundayBp?: number;
+  readonly holidayBp?: number;
+  readonly overtimeBp?: number;
+}
+
+/**
+ * Construit les règles **effectives** à appliquer pour un segment, en
+ * appliquant la règle "plus favorable" entre CCT et contrat client.
+ *
+ * Invariants :
+ * - La règle CCT/LTr est le **plancher** : on ne descend jamais en dessous.
+ * - Un override contractuel `>` règle CCT s'applique (l'employeur s'est
+ *   engagé à mieux — il doit tenir parole).
+ * - Un override contractuel `<` règle CCT est **ignoré** (protection
+ *   légale infranchissable). Log de DETTE silencieux → DPO peut traquer
+ *   si un contrat propose régulièrement moins que CCT.
+ *
+ * `stackSundayAndNight` et `overtimeThresholdMinutes` ne sont PAS
+ * overridables côté contrat (propriétés de la CCT de branche, pas du
+ * contrat individuel).
+ */
+export function applyContractOverrides(
+  cctRules: PayrollSurchargeRules,
+  contractOverrides: ContractSurchargeOverrides | undefined,
+): PayrollSurchargeRules {
+  if (!contractOverrides) return cctRules;
+  return {
+    ...cctRules,
+    nightBp: Math.max(cctRules.nightBp, contractOverrides.nightBp ?? 0),
+    sundayBp: Math.max(cctRules.sundayBp, contractOverrides.sundayBp ?? 0),
+    holidayBp: Math.max(cctRules.holidayBp, contractOverrides.holidayBp ?? 0),
+    overtimeBp: Math.max(cctRules.overtimeBp, contractOverrides.overtimeBp ?? 0),
+  };
+}
