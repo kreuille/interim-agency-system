@@ -1,15 +1,15 @@
 # PROGRESS.md — État d'avancement du projet
 
-> **Dernière mise à jour** : 2026-04-23 15:00 — **DETTE-033 + DETTE-035 fermées** (PR #79, commit `a38b712`) : worker `/metrics` endpoint port 9090 + 20 business counters PII-safe (paie 5 + availability 4 + DR 8 + MP 3) + 4 dashboards Grafana mis à jour. **44/48 prompts catalogue** + 2 PRs ad-hoc. **1210 unit + 53 integration tests** (vs 1167/53, +43 unit). Reste : A6.6 pentest + A6.7 go-live (externes). Prochain prompt suggéré : **DETTE-037** (job CI test-roundtrip backup/DR mensuel).
+> **Dernière mise à jour** : 2026-04-23 19:00 — **DETTE-037 fully closed** (PR #81 squelette `4bbb891` + PR #82 enhancements `78933e0`) : workflow CI `dr-roundtrip.yml` avec 4 asserts explicites (`assert_sha256` + `assert_age_header` + `assert_rpo` 900s + `assert_rto` 14400s), scripts `ops/backup/*.sh` CI-friendly (JSON Lines si `CI=true`, exit codes 0-6 normalisés dans `_lib.sh`), job shellcheck en gate, artifacts enrichis on failure, runbook DR §7 "Validation CI automatique" avec gameday checklist. **Test régression intentionnel exécuté** (sha256 random injecté → workflow rouge sur assert_sha256 → revert → vert). **44/48 prompts catalogue** + 2 PRs ad-hoc. **Sprint A.6 complet côté code.** Reste uniquement actions externes : A0.4 (provisioning GCP/Infomaniak) + A5.5 (Swissdec sandbox) + A6.6 (pentest) + A6.7 (go-live). **Prochain prompt : STOP code-only → bascule orchestrateur vers actions externes.**
 > **Source de vérité** pour l'orchestrateur. **Ne jamais** le mettre à jour à la main sans avoir suivi le protocole `ORCHESTRATOR.md`.
 
 ---
 
 ## 0. Instantané
 
-- **Sprint courant** : A.6 (5/7 prompts complétés, A6.5 fermé)
-- **Phase** : MVP + observabilité production-ready (logs structurés, dashboards Grafana **vivants** avec 20 business counters, alertes P1/P2/P3, DR RPO ≤ 6 min RTO ≤ 4h démontrés). Restent **uniquement** A6.6 (pentest externe) + A6.7 (go-live, dépend autorisation LSE + provisioning GCP).
-- **Prochain prompt** : **DETTE-037** (job CI mensuel `test-roundtrip` backup/DR) — dernière dette critique avant pilote, évite régression silencieuse sur scripts shell DR.
+- **Sprint courant** : A.6 (5/7 prompts complétés côté code — A6.6 + A6.7 restent en actions externes)
+- **Phase** : MVP + observabilité production-ready (logs structurés, dashboards Grafana **vivants** avec 20 business counters, alertes P1/P2/P3, DR RPO ≤ 6 min RTO ≤ 4h démontrés, **workflow CI DETTE-037 verrouille la non-régression DR mensuellement**). Restent **uniquement** actions externes (pas de code à écrire côté Claude) : A0.4, A5.5, A6.6, A6.7.
+- **Prochain prompt** : **STOP code-only — bascule actions externes.** Le code sprint A.6 est terminé. Voir **§1 "STOP code-only"** ci-dessous pour l'ordre des actions humaines (A0.4, A5.5, A6.6, A6.7).
 - **Prompts complétés** : 44 / 48 catalogue (91.7%) + 2 ad-hoc (design + dev fix) + 0 / 5 OPS
 - **Blockers ouverts** : 2 (BLOCKER-001 sandbox MP, BLOCKER-002 autorisation LSE — externes, non-dev)
 - **Dette technique** : 13 ouvertes / 26 fermées (DETTE-033/035 closes, 2 nouvelles DETTE-040/041 wiring runtime)
@@ -128,17 +128,30 @@
 | `A6.6-pentest-externe` | A.6 | L | Prestataire CH + budget | Action humaine. Stagnation tant que pilote pas livré |
 | `A6.7-go-live-pilote` | A.6 | M | A0.4, A0.6 (Firebase), A6.5, BLOCKER-002 (autorisation LSE), client pilote signé | Jour J — checklist déploiement Cloud Run + cutover DNS + monitoring |
 
-### 🔵 Pending — code prioritaire (clôture observabilité opérationnelle)
+### 🔴 STOP code-only — bascule actions externes (orchestrateur)
+
+**Sprint A.6 côté code est terminé.** Les 4 dettes critiques bloquantes pour le pilote (036, 033, 035, 037) sont toutes closes. Le backlog ci-dessous ne bloque **pas** le pilote et relève du sprint A.7 (post go-live) — à reprendre sur instruction utilisateur après que les actions externes ci-dessous soient complétées.
+
+#### Actions externes requises (ordre pragmatique)
+
+| Ordre | Action | Qui | Bloque quoi |
+|-------|--------|-----|-------------|
+| 1 | **A0.4** — provisioning GCP `europe-west6` (Cloud SQL + Memorystore + Cloud Storage CMEK + Secret Manager + OIDC WIF + DPA Google Cloud Switzerland GmbH) | Fondateur + DevOps lead + DPO | A6.7 go-live + déploiement paie réel |
+| 2 | **Rotation clés age prod** : générer paire age réelle, pousser publique dans Secret Manager, stocker privée scopée DR uniquement | DPO + DevOps lead | Premier backup prod chiffré |
+| 3 | **A5.5** — Swissdec ELM sandbox (SOAP + signatures électroniques + tests AVS/SUVA/IS) | Lead tech + Swissdec partenaire externe | Déclarations salaire réelles (bloquant légal fin de mois) |
+| 4 | **A6.6** — pentest externe (prestataire CH, budget alloué) | Fondateur + prestataire | Go-live prod (exige rapport clean) |
+| 5 | **A6.7** — gameday DR + go-live (checklist déploiement Cloud Run + cutover DNS + monitoring) | Équipe ops on-call | Livraison pilote |
+
+#### Backlog technique A.7 (à reprendre post go-live, **non bloquant pilote**)
 
 | Ordre | Prompt | Sprint | Effort | Notes |
 |-------|--------|--------|--------|-------|
-| 1 | **`DETTE-037`** (job CI test-roundtrip mensuel) | A.6 | M | **Prochain travail prêt à lancer** — Job GitHub Actions qui exécute `ops/backup/test-roundtrip.sh` dans compose `dr-test`. Évite régression silencieuse sur scripts shell DR. Dernière dette critique avant pilote |
-| 2 | `DETTE-041` (onScrape gauges DB outbox) | A.7 | S | Wire `onScrape` hook côté worker pour scraper Postgres et mettre à jour `availability_outbox_pending_count` + `availability_outbox_lag_seconds`. Sans ça, ces 2 gauges restent à 0 même si l'outbox déborde |
-| 3 | `DETTE-040` (wire metrics callbacks main.ts) | A.7 | S | Quand DETTE-014/015 done : wire `createAvailabilitySyncWorker({ ..., onResult: ... → metrics })` etc. dans `apps/worker/src/main.ts`. Préparer la propagation `agencyId` depuis le job BullMQ |
-| 4 | `DETTE-038` (wire preload canton-holidays bootstrap) | A.7 | XS | Appeler `PrismaCantonHolidayRepository.preload()` au bootstrap API |
-| 5 | `DETTE-034` (oncall-sms-bridge) | A.7 | M | Passerelle webhook → Swisscom SMS API pour Alertmanager receiver `on-call` |
-| 6 | `DETTE-039` (Jeûne genevois `sunday_relative`) | A.7 | XS | Raffiner placeholder `fixed 9/1` GE → `sunday_relative {ordinal:1, offset:4}` |
-| 7 | `DETTE-036(a) bis` (ADR canton_holidays double mécanisme) | A.7 | S | ADR formelle pour entériner double mécanisme |
+| 1 | `DETTE-041` (onScrape gauges DB outbox) | A.7 | S | Wire `onScrape` hook côté worker pour scraper Postgres et mettre à jour `availability_outbox_pending_count` + `availability_outbox_lag_seconds`. Sans ça, ces 2 gauges restent à 0 même si l'outbox déborde |
+| 2 | `DETTE-040` (wire metrics callbacks main.ts) | A.7 | S | Quand DETTE-014/015 done : wire `createAvailabilitySyncWorker({ ..., onResult: ... → metrics })` etc. dans `apps/worker/src/main.ts`. Préparer la propagation `agencyId` depuis le job BullMQ |
+| 3 | `DETTE-038` (wire preload canton-holidays bootstrap) | A.7 | XS | Appeler `PrismaCantonHolidayRepository.preload()` au bootstrap API |
+| 4 | `DETTE-034` (oncall-sms-bridge) | A.7 | M | Passerelle webhook → Swisscom SMS API pour Alertmanager receiver `on-call` |
+| 5 | `DETTE-039` (Jeûne genevois `sunday_relative`) | A.7 | XS | Raffiner placeholder `fixed 9/1` GE → `sunday_relative {ordinal:1, offset:4}` |
+| 6 | `DETTE-036(a) bis` (ADR canton_holidays double mécanisme) | A.7 | S | ADR formelle pour entériner double mécanisme |
 
 ### 🔵 Pending — OPS transversal (5 prompts catalogués)
 
@@ -278,7 +291,7 @@ Décisions prises et non renégociables sans ADR. Mettre à jour au fil de l'eau
 | DETTE-041 | 2026-04-23 | Wire `onScrape` hook côté worker pour scraper Postgres et mettre à jour `availability_outbox_pending_count` + `availability_outbox_lag_seconds`. Sans ça, ces 2 gauges restent à 0 | S | A.6 (court terme, faisable immédiatement) |
 | ~~DETTE-036~~ | ~~2026-04-23~~ | ~~A5.2 divergence : (a) port TS vs table Prisma ; (b) Tessin manquant ; (c) règle "plus favorable"~~ — **CLOSE 2026-04-23 13:00 via PR #77** : table Prisma versionnée + 26 cantons (Tessin inclus) + `applyContractOverrides()` + 947 rows seedées + 9 integration tests + coverage 98.86% | ~~M~~ | ✅ |
 | DETTE-036(a) bis | 2026-04-23 | ADR formelle pour entériner double mécanisme (port TS fallback + table Prisma source de vérité) OU supprimer `StaticCantonHolidaysPort` après wiring complet | S | A.7 |
-| DETTE-037 | 2026-04-23 | Job CI mensuel qui exécute `ops/backup/test-roundtrip.sh` dans GitHub Actions (compose `dr-test` + age + bash). Sinon le test E2E ne tourne qu'en local — risque de régression silencieuse sur scripts shell | M | A.6 (avant pilote) |
+| ~~DETTE-037~~ | ~~2026-04-23~~ | ~~Job CI mensuel qui exécute `ops/backup/test-roundtrip.sh` dans GitHub Actions~~ — **CLOSE 2026-04-23 19:00 via PR #81 (squelette `4bbb891`) + PR #82 (enhancements `78933e0`)** : workflow `.github/workflows/dr-roundtrip.yml` avec 4 asserts (`assert_sha256` + `assert_age_header` + `assert_rpo` + `assert_rto`), scripts `ops/backup/*.sh` CI-friendly (JSON Lines + exit codes 0-6 via `_lib.sh`), shellcheck gate, artifacts enrichis on failure, runbook §7 "Validation CI automatique", test régression intentionnel exécuté avec succès | ~~M~~ | ✅ |
 | DETTE-038 | 2026-04-23 | Wire `PrismaCantonHolidayRepository.preload()` au bootstrap de l'API pour les cantons + années actifs (typiquement année courante + N+1). Sans ça, le cache reste vide en runtime → fallback silencieux sur `StaticCantonHolidaysPort` requis | XS | A.7 (avec wiring `RunPayrollWeekUseCase`) |
 | DETTE-039 | 2026-04-23 | Le Jeûne genevois exact (jeudi après 1er dim sept) est codé en dur comme `fixed 9/1` placeholder dans GE — à raffiner via `sunday_relative {ordinal:1, offset:4}` | XS | A.7 |
 

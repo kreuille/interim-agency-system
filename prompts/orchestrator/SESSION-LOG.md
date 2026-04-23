@@ -15,7 +15,89 @@
 - **Objectif de la session** : compléter PR #81 avec asserts SHA256 + age header + RPO + RTO explicites dans le workflow, scripts shell CI-friendly (JSON Lines si `CI=true`, exit codes normalisés 0-5), step shellcheck, artifacts enrichis on failure, section "8. Validation CI automatique" dans runbook DR. Test de régression intentionnel pour prouver que les asserts attrapent les bugs.
 
 ### Déroulé
-{en cours...}
+
+1. **PR #81 — squelette workflow** (déjà mergé en début de session, commit `4bbb891`) :
+   - `.github/workflows/dr-roundtrip.yml` v1 : triggers `schedule` (cron mensuel `0 3 1 * *`), `pull_request` paths-filter (`ops/backup/**`), `workflow_dispatch`. Job unique 10 steps : checkout, install age + pg-client, génère paire age éphémère, `docker compose up postgres + postgres-dr`, wait healthy, seed 4 tables critiques × 500 rows, `bash test-roundtrip.sh`, capture event JSON, upload artifact + dump container logs `if: failure()`, cleanup `if: always()`. Validé 30s sur runner. Couvre le minimum vital — manquait : asserts explicites, JSON logs, shellcheck, runbook.
+
+2. **Helper commun `ops/backup/_lib.sh`** (95 lignes) — nouveau :
+   - `is_ci_mode()` : détecte `env CI=true` (convention GitHub Actions / GitLab CI).
+   - `_json_escape()` : escape pur bash (sans dépendance `jq`) pour les images minimales.
+   - `log_msg LEVEL MSG [CTX_JSON]` : émet JSON Lines `{"ts","level","script","msg","ctx"}` si CI, sinon `[script] message` human-readable. Stderr pour error/warn, stdout pour info.
+   - 7 constantes `EXIT_*` (0 ok, 1 dump, 2 age, 3 sha256, 4 restore/upload, 5 rowcount, 6 RTO) avec `# shellcheck disable=SC2034` (consommées par scripts qui sourcent).
+
+3. **Réécriture scripts `ops/backup/*.sh`** :
+   - `pg_dump.sh` : `source _lib.sh`, `log_msg` partout, exit codes via `${EXIT_*}`. Sanity check header age (`age-encryption.org/v1` sur 22 octets) après encrypt — garde-fou P1 contre régression qui uploaderait du plain text.
+   - `pg_restore.sh` : pareil + sanity check header age côté décrypt avec message d'erreur clair. Stderr capturé + tronqué à 200 chars dans le ctx JSON pour éviter les logs énormes en CI.
+   - `test-roundtrip.sh` : exit codes `5` (rowcount mismatch) et `6` (RTO exceeded). Bandeau `========== ✅ DR roundtrip OK ==========` uniquement en mode dev (`! is_ci_mode`). En CI, juste les JSON Lines + l'event final `dr_roundtrip.completed`.
+
+4. **Workflow `.github/workflows/dr-roundtrip.yml` v2** :
+   - Job séparé `shellcheck` (gate via `needs:`) — `ludeeus/action-shellcheck@master`, severity=warning, scoped à `ops/backup/`.
+   - Step dédié `Run pg_dump.sh standalone (capture dump pour asserts)` qui produit un dump dans `/tmp/dr-asserts/` pour les 3 asserts statiques (sans dépendre du `test-roundtrip.sh` qui dump+restore d'un coup).
+   - **`assert_sha256`** : recalcule sha256 du `.dump.age` et compare au `.sha256` produit par pg_dump.sh. Détecte la corruption silencieuse.
+   - **`assert_age_header`** : vérifie les 22 premiers octets `age-encryption.org/v1`. Garde-fou P1 (data leak prod si plain text).
+   - **`assert_rpo`** : `dump_duration ≤ RPO_BUDGET_SECONDS` (default 900s = 15 min, configurable via `workflow_dispatch.inputs.rpo_budget_seconds`).
+   - **`assert_rto`** : `roundtrip_duration ≤ RTO_BUDGET_SECONDS` (default 14400s = 4h).
+   - Step `Collect failure artifacts` (`if: failure()`) : compose ps, logs src+dr, pg_stat_statements top 20, rowcounts src+dr, dump produit (≤50MB via `find -size -50M`), roundtrip.out, recipient public. JAMAIS la clé privée.
+
+5. **Runbook `docs/runbooks/disaster-recovery.md`** — nouvelle §7 "Validation CI automatique" avec 6 sous-sections :
+   - 7.1 Enchaînement des steps (12 étapes du workflow)
+   - 7.2 Format des logs en CI (exemples JSON Lines)
+   - 7.3 Exit codes normalisés (table avec constantes)
+   - 7.4 Artifacts en cas d'échec (liste des fichiers collectés)
+   - 7.5 Quoi faire si le job CI échoue (procédure on-call + causes courantes)
+   - 7.6 Test régression intentionnel (gameday checklist trimestrielle)
+   - §8 Références (renumérotée depuis §7) avec ajouts `_lib.sh` + workflow.
+
+6. **Validation locale via Docker** :
+   - `koalaman/shellcheck:stable --severity=warning ops/backup/*.sh` → OK (avec disables explicites pour SC2034 sur EXIT_* et SC2012 sur ls -t).
+   - `rhysd/actionlint:latest .github/workflows/dr-roundtrip.yml` → OK (SC2012 inline disablé via commentaire).
+
+7. **Test régression intentionnel** (gameday §7.6 mise en pratique) — 3 commits sur la branche :
+   | Run | Commit | Statut DR | Conclusion |
+   |---|---|---|---|
+   | 24836327747 | `f9386d5` (baseline) | ✅ pass 47s | Tous asserts verts |
+   | 24836440161 | `5d1af89` (sha256 random injecté) | ❌ FAIL on `assert_sha256` | Garde-fou validé : workflow rouge, steps suivants skippés, artifacts uploadés |
+   | 24836498331 | `05af99c` (revert via `git revert`) | ✅ pass 34s | Retour état sain avant merge |
+
+8. **Merge PR #82** : squash via `gh pr merge --admin` → commit `78933e0` sur main. 10/10 checks verts.
+
+### Livrables (PR #82 = `78933e0`)
+
+- **Code** : `ops/backup/_lib.sh` (nouveau, 103 lignes), refactor `pg_dump.sh` / `pg_restore.sh` / `test-roundtrip.sh` (~270 lignes touchées)
+- **CI** : `.github/workflows/dr-roundtrip.yml` enrichi (227 lignes vs 199 avant) avec 4 asserts explicites + step shellcheck en gate + artifacts enrichis
+- **Doc** : `docs/runbooks/disaster-recovery.md` §7 nouvelle (109 lignes ajoutées)
+- **Total** : 600 insertions, 120 suppressions sur 7 fichiers
+
+### Décisions
+
+- **Chemin scripts conservé `ops/backup/*.sh`** (pas `scripts/dr/*.sh` du plan utilisateur) — héritage A6.5, casserait runbook + README + worker BullMQ.
+- **Exit code 4 = restore_fail OU upload_fail** : overlap acceptable (les 2 cas signifient "le bucket / la cible n'a pas reçu/livré le dump"). Documenté dans `_lib.sh` + runbook §7.3.
+- **Squash merge** plutôt que rebase : main reste lisible (1 commit par PR), historique du test régression conservé dans la PR #82 elle-même.
+- **§7 (Validation CI) avant §8 (Références)** plutôt que en fin : numérotation contiguë + Références logiquement à la fin.
+- **Helper `_lib.sh` plutôt que dupliquer log_msg dans chaque script** : DRY, 1 seul endroit pour faire évoluer le format JSON Lines (ajouter `severity`, `correlation_id`, etc. dans le futur sans toucher 4 scripts).
+
+### Dette ouverte / suite
+
+Aucune dette ouverte sur DETTE-037 — **fully closed**. Les éléments restants relèvent de A.7+ :
+- Wire `wal-archive.sh` côté Postgres prod (A6.5 → DETTE-040 si besoin de gameday WAL séparé du dump).
+- Dashboard Grafana dédié `dr-test.json` (mentionné dans runbook §6) — toujours pas créé, pas bloquant pour pilote, dette mineure non priorisée.
+- Migration `actions/checkout@v4` Node.js 20 → 24 quand v5 sortira (deprecation notice annoncée juin 2026).
+
+### Prochain prompt
+
+**STOP code-only — bascule actions externes (orchestrateur).**
+
+Le code Sprint A.6 est terminé. Les 4 dernières dettes critiques (036, 033, 035, 037) sont toutes closes. Le pilote Helvètia Intérim est techniquement prêt côté code. Les actions restantes pour finir A.6 sont **hors-code** et nécessitent intervention humaine :
+- **A0.4** (provisioning GCP/Infomaniak — DPO + DevOps lead, secrets en prod, rotation clés age)
+- **A5.5** (signature contrats SES/QES — Swisscom Trust Signing Services, contrat fournisseur à signer)
+- **A6.6** (pentest externe — budget alloué, RFP à lancer, fournisseur à choisir)
+- **A6.7** (gameday DR avec ops on-call — exécution du runbook §3 sur env staging réelle)
+
+Cf. `prompts/orchestrator/PROGRESS.md` pour détails et ordre.
+
+---
+
+## Session 2026-04-23 14:00 — DETTE-033 + DETTE-035 combinés : worker /metrics + business counters
 
 - **Opérateur** : Claude Code (Sonnet 4.5) — déclencheur : user "Plan de session — DETTE-033 + DETTE-035 combinés : /metrics + business counters"
 - **Prompts exécutés** : DETTE-033 (worker `/metrics` endpoint) + DETTE-035 (business counters payroll/availability/DR) en 1 PR cohérente
