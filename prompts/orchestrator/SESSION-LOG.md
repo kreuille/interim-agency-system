@@ -5,7 +5,17 @@
 
 ---
 
-## Session 2026-04-23 14:00 — DETTE-033 + DETTE-035 combinés : worker /metrics + business counters
+## Session 2026-04-23 18:00 — DETTE-037 : workflow CI dr-roundtrip (squelette PR #81 + enhancements PR #82)
+
+- **Opérateur** : Claude Code (Sonnet 4.5) — 2 PRs en chaîne : PR #81 (squelette workflow, mergée commit `4bbb891`) puis PR #82 (enhancements, cette session).
+- **Sprint** : A.6 (consolidation pré-pilote)
+- **Branche Git** : `feat/DETTE-037-enhancements` (PR #82)
+- **Skills chargées** : `skills/dev/devops-swiss/SKILL.md`, `skills/dev/testing-strategy/SKILL.md`, `skills/ops/release-management/SKILL.md`
+- **Note chemin scripts** : le plan utilisateur dit `scripts/dr/*.sh` — dans le repo réel, héritage A6.5, ils sont à `ops/backup/*.sh`. On garde la convention existante pour ne pas casser toutes les références (runbook, README, worker BullMQ qui les wrap).
+- **Objectif de la session** : compléter PR #81 avec asserts SHA256 + age header + RPO + RTO explicites dans le workflow, scripts shell CI-friendly (JSON Lines si `CI=true`, exit codes normalisés 0-5), step shellcheck, artifacts enrichis on failure, section "8. Validation CI automatique" dans runbook DR. Test de régression intentionnel pour prouver que les asserts attrapent les bugs.
+
+### Déroulé
+{en cours...}
 
 - **Opérateur** : Claude Code (Sonnet 4.5) — déclencheur : user "Plan de session — DETTE-033 + DETTE-035 combinés : /metrics + business counters"
 - **Prompts exécutés** : DETTE-033 (worker `/metrics` endpoint) + DETTE-035 (business counters payroll/availability/DR) en 1 PR cohérente

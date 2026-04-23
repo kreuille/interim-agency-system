@@ -25,12 +25,12 @@
 #   BACKUP_DEST=/var/backups/interim \
 #   ./ops/backup/pg_dump.sh
 #
-# Exit codes :
+# Exit codes (cf. _lib.sh) :
 #   0 = succès, dump+chiffrement+upload OK
-#   1 = paramètres manquants
-#   2 = pg_dump a échoué
-#   3 = chiffrement age a échoué
-#   4 = upload destination a échoué
+#   1 = pg_dump a échoué (EXIT_DUMP_FAIL)
+#   2 = chiffrement age a échoué (EXIT_AGE_FAIL)
+#   3 = génération sha256 a échoué (EXIT_SHA256_FAIL)
+#   4 = upload destination a échoué (EXIT_RESTORE_FAIL — overlap acceptable)
 #
 # Dépendances :
 #   - postgresql-client (pg_dump 16+)
@@ -41,6 +41,10 @@
 # Référence : docs/runbooks/disaster-recovery.md
 
 set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=ops/backup/_lib.sh
+source "${SCRIPT_DIR}/_lib.sh"
 
 # ---------- Validation paramètres ----------
 : "${PG_HOST:?PG_HOST manquant — ex: postgres ou cloud-sql-proxy}"
@@ -63,8 +67,8 @@ ENCRYPTED_FILE="${WORK_DIR}/pgdump_${PG_DB}_${TS}.dump.age"
 SHA256_FILE="${ENCRYPTED_FILE}.sha256"
 
 # ---------- pg_dump ----------
-echo "[pg_dump] start ${PG_DB}@${PG_HOST}:${PG_PORT} → ${DUMP_FILE}"
-PGPASSWORD="${PGPASSWORD:-}" pg_dump \
+log_msg info "pg_dump start" "{\"db\":\"${PG_DB}\",\"host\":\"${PG_HOST}\",\"port\":${PG_PORT},\"out\":\"${DUMP_FILE}\"}"
+if ! PGPASSWORD="${PGPASSWORD:-}" pg_dump \
   --host="${PG_HOST}" \
   --port="${PG_PORT}" \
   --username="${PG_USER}" \
@@ -74,42 +78,67 @@ PGPASSWORD="${PGPASSWORD:-}" pg_dump \
   --no-owner \
   --no-privileges \
   --verbose \
-  --file="${DUMP_FILE}" 2>"${WORK_DIR}/pg_dump.stderr" || {
-  echo "[pg_dump] FAILED — see stderr:"
+  --file="${DUMP_FILE}" 2>"${WORK_DIR}/pg_dump.stderr"; then
+  log_msg error "pg_dump failed" "{\"db\":\"${PG_DB}\",\"stderr_tail\":\"$(tail -5 "${WORK_DIR}/pg_dump.stderr" | tr '\n' ' ' | cut -c1-200)\"}"
   cat "${WORK_DIR}/pg_dump.stderr" >&2
-  exit 2
-}
+  exit "${EXIT_DUMP_FAIL}"
+fi
 
 DUMP_SIZE=$(stat -c%s "${DUMP_FILE}" 2>/dev/null || stat -f%z "${DUMP_FILE}")
-echo "[pg_dump] OK — ${DUMP_SIZE} bytes"
+log_msg info "pg_dump ok" "{\"db\":\"${PG_DB}\",\"sizeBytes\":${DUMP_SIZE}}"
 
 # ---------- age encrypt ----------
-echo "[age] encrypt → ${ENCRYPTED_FILE}"
-age --encrypt --recipient "${AGE_RECIPIENT}" --output "${ENCRYPTED_FILE}" "${DUMP_FILE}" || {
-  echo "[age] FAILED" >&2
-  exit 3
-}
+log_msg info "age encrypt start" "{\"out\":\"${ENCRYPTED_FILE}\"}"
+if ! age --encrypt --recipient "${AGE_RECIPIENT}" --output "${ENCRYPTED_FILE}" "${DUMP_FILE}"; then
+  log_msg error "age encrypt failed" "{\"recipientHint\":\"${AGE_RECIPIENT:0:8}...\"}"
+  exit "${EXIT_AGE_FAIL}"
+fi
 ENCRYPTED_SIZE=$(stat -c%s "${ENCRYPTED_FILE}" 2>/dev/null || stat -f%z "${ENCRYPTED_FILE}")
-echo "[age] OK — ${ENCRYPTED_SIZE} bytes"
+log_msg info "age encrypt ok" "{\"sizeBytes\":${ENCRYPTED_SIZE}}"
+
+# Sanity check : header age = "age-encryption.org/v1\n" en clair
+# (cf. https://age-encryption.org/v1) — assert qu'on a bien écrit un
+# blob age et pas du plain text par accident.
+AGE_MAGIC=$(head -c 22 "${ENCRYPTED_FILE}" 2>/dev/null || true)
+if [[ "${AGE_MAGIC}" != "age-encryption.org/v1" ]]; then
+  log_msg error "age header invalid" "{\"got\":\"${AGE_MAGIC}\"}"
+  exit "${EXIT_AGE_FAIL}"
+fi
 
 # ---------- checksum ----------
-sha256sum "${ENCRYPTED_FILE}" | awk '{print $1}' >"${SHA256_FILE}"
-echo "[sha256] $(cat "${SHA256_FILE}")"
+if ! sha256sum "${ENCRYPTED_FILE}" | awk '{print $1}' >"${SHA256_FILE}"; then
+  log_msg error "sha256 generation failed"
+  exit "${EXIT_SHA256_FAIL}"
+fi
+SHA_HASH="$(cat "${SHA256_FILE}")"
+log_msg info "sha256 ok" "{\"sha256\":\"${SHA_HASH}\"}"
 
 # ---------- upload ----------
 case "${BACKUP_DEST}" in
   gs://*)
     # GCS via gsutil (préinstallé sur Cloud Run / Compute Engine)
-    echo "[upload] gsutil cp → ${BACKUP_DEST}/"
-    gsutil -q cp "${ENCRYPTED_FILE}" "${BACKUP_DEST}/" || { echo "[upload] gsutil failed" >&2; exit 4; }
-    gsutil -q cp "${SHA256_FILE}" "${BACKUP_DEST}/" || { echo "[upload] gsutil failed (sha256)" >&2; exit 4; }
+    log_msg info "upload gsutil start" "{\"dest\":\"${BACKUP_DEST}\"}"
+    if ! gsutil -q cp "${ENCRYPTED_FILE}" "${BACKUP_DEST}/"; then
+      log_msg error "upload gsutil failed (dump)" "{\"dest\":\"${BACKUP_DEST}\"}"
+      exit "${EXIT_RESTORE_FAIL}"
+    fi
+    if ! gsutil -q cp "${SHA256_FILE}" "${BACKUP_DEST}/"; then
+      log_msg error "upload gsutil failed (sha256)" "{\"dest\":\"${BACKUP_DEST}\"}"
+      exit "${EXIT_RESTORE_FAIL}"
+    fi
     ;;
   *)
     # Filesystem local (dev, ou bucket monté via gcsfuse)
     mkdir -p "${BACKUP_DEST}"
-    cp "${ENCRYPTED_FILE}" "${BACKUP_DEST}/" || { echo "[upload] cp failed" >&2; exit 4; }
-    cp "${SHA256_FILE}" "${BACKUP_DEST}/" || { echo "[upload] cp failed (sha256)" >&2; exit 4; }
-    echo "[upload] local cp → ${BACKUP_DEST}"
+    if ! cp "${ENCRYPTED_FILE}" "${BACKUP_DEST}/"; then
+      log_msg error "upload cp failed (dump)" "{\"dest\":\"${BACKUP_DEST}\"}"
+      exit "${EXIT_RESTORE_FAIL}"
+    fi
+    if ! cp "${SHA256_FILE}" "${BACKUP_DEST}/"; then
+      log_msg error "upload cp failed (sha256)" "{\"dest\":\"${BACKUP_DEST}\"}"
+      exit "${EXIT_RESTORE_FAIL}"
+    fi
+    log_msg info "upload local cp ok" "{\"dest\":\"${BACKUP_DEST}\"}"
 
     # Garder uniquement les N derniers dumps locaux
     if [[ -d "${BACKUP_DEST}" ]]; then
@@ -123,5 +152,9 @@ case "${BACKUP_DEST}" in
     ;;
 esac
 
-# ---------- output structuré (consommable par Promtail) ----------
-echo "{\"event\":\"pg_dump.completed\",\"db\":\"${PG_DB}\",\"timestamp\":\"${TS}\",\"sizeBytes\":${ENCRYPTED_SIZE},\"sha256\":\"$(cat "${SHA256_FILE}")\",\"dest\":\"${BACKUP_DEST}\"}"
+# ---------- output structuré final (event consommable Promtail/CI) ----------
+# Ce log est INTENTIONNELLEMENT au format JSON event-style (différent
+# du format JSON Lines de log_msg) — il est consommé par les asserts
+# CI (workflow dr-roundtrip.yml) qui parsent `event=pg_dump.completed`.
+printf '{"event":"pg_dump.completed","db":"%s","timestamp":"%s","sizeBytes":%s,"sha256":"%s","dest":"%s"}\n' \
+  "${PG_DB}" "${TS}" "${ENCRYPTED_SIZE}" "${SHA_HASH}" "${BACKUP_DEST}"

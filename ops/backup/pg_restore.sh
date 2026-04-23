@@ -23,17 +23,23 @@
 #   AGE_IDENTITY_FILE=~/.config/age/restore-key.txt \
 #   ./ops/backup/pg_restore.sh
 #
-# Exit codes :
+# Exit codes (cf. _lib.sh) :
 #   0 = succès
-#   1 = paramètres manquants
-#   2 = téléchargement source a échoué
-#   3 = sha256 mismatch (bit rot ou tampering)
-#   4 = déchiffrement age a échoué
-#   5 = pg_restore a échoué
+#   2 = déchiffrement age a échoué (EXIT_AGE_FAIL)
+#   3 = sha256 mismatch ou téléchargement source échoué (EXIT_SHA256_FAIL)
+#   4 = pg_restore a échoué OU guard suffix _dr (EXIT_RESTORE_FAIL)
+#
+# Note : le téléchargement source (gsutil/cp) est rangé dans EXIT_SHA256_FAIL
+# parce que le résultat fonctionnel est identique (impossible de vérifier
+# l'intégrité d'un fichier qu'on n'a pas) — overlap documenté.
 #
 # Référence : docs/runbooks/disaster-recovery.md
 
 set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=ops/backup/_lib.sh
+source "${SCRIPT_DIR}/_lib.sh"
 
 : "${PG_HOST:?PG_HOST manquant}"
 : "${PG_USER:?PG_USER manquant}"
@@ -51,14 +57,23 @@ DUMP_FILE="${WORK_DIR}/restore.dump"
 START_TS=$(date -u +%s)
 
 # ---------- 1. Download ----------
-echo "[restore] download ${BACKUP_SRC}"
+log_msg info "download start" "{\"src\":\"${BACKUP_SRC}\"}"
 case "${BACKUP_SRC}" in
   gs://*)
-    gsutil -q cp "${BACKUP_SRC}" "${ENCRYPTED_FILE}" || { echo "[download] gsutil failed" >&2; exit 2; }
-    gsutil -q cp "${BACKUP_SRC}.sha256" "${SHA256_FILE}" || { echo "[download] gsutil sha256 failed" >&2; exit 2; }
+    if ! gsutil -q cp "${BACKUP_SRC}" "${ENCRYPTED_FILE}"; then
+      log_msg error "download gsutil failed (dump)" "{\"src\":\"${BACKUP_SRC}\"}"
+      exit "${EXIT_SHA256_FAIL}"
+    fi
+    if ! gsutil -q cp "${BACKUP_SRC}.sha256" "${SHA256_FILE}"; then
+      log_msg error "download gsutil failed (sha256)" "{\"src\":\"${BACKUP_SRC}.sha256\"}"
+      exit "${EXIT_SHA256_FAIL}"
+    fi
     ;;
   *)
-    [[ -f "${BACKUP_SRC}" ]] || { echo "[download] ${BACKUP_SRC} introuvable" >&2; exit 2; }
+    if [[ ! -f "${BACKUP_SRC}" ]]; then
+      log_msg error "download local source not found" "{\"src\":\"${BACKUP_SRC}\"}"
+      exit "${EXIT_SHA256_FAIL}"
+    fi
     cp "${BACKUP_SRC}" "${ENCRYPTED_FILE}"
     cp "${BACKUP_SRC}.sha256" "${SHA256_FILE}"
     ;;
@@ -68,18 +83,27 @@ esac
 EXPECTED_SHA=$(cat "${SHA256_FILE}")
 ACTUAL_SHA=$(sha256sum "${ENCRYPTED_FILE}" | awk '{print $1}')
 if [[ "${EXPECTED_SHA}" != "${ACTUAL_SHA}" ]]; then
-  echo "[sha256] MISMATCH expected=${EXPECTED_SHA} actual=${ACTUAL_SHA}" >&2
-  echo "[sha256] backup corrompu (bit rot bucket OU tampering) — STOP" >&2
-  exit 3
+  log_msg error "sha256 mismatch — backup corrompu (bit rot OU tampering)" \
+    "{\"expected\":\"${EXPECTED_SHA}\",\"actual\":\"${ACTUAL_SHA}\"}"
+  exit "${EXIT_SHA256_FAIL}"
 fi
-echo "[sha256] OK ${ACTUAL_SHA}"
+log_msg info "sha256 ok" "{\"sha256\":\"${ACTUAL_SHA}\"}"
+
+# Sanity check age header avant de tenter le décrypt — donne un message
+# d'erreur clair si BACKUP_SRC pointe sur un fichier qui n'est pas un
+# blob age (ex: dump non chiffré envoyé par erreur).
+AGE_MAGIC=$(head -c 22 "${ENCRYPTED_FILE}" 2>/dev/null || true)
+if [[ "${AGE_MAGIC}" != "age-encryption.org/v1" ]]; then
+  log_msg error "age header invalid — fichier source pas un blob age" "{\"got\":\"${AGE_MAGIC}\"}"
+  exit "${EXIT_AGE_FAIL}"
+fi
 
 # ---------- 3. Déchiffrement ----------
-echo "[age] decrypt → ${DUMP_FILE}"
-age --decrypt --identity "${AGE_IDENTITY_FILE}" --output "${DUMP_FILE}" "${ENCRYPTED_FILE}" || {
-  echo "[age] FAILED — clé identity invalide ?" >&2
-  exit 4
-}
+log_msg info "age decrypt start" "{\"out\":\"${DUMP_FILE}\"}"
+if ! age --decrypt --identity "${AGE_IDENTITY_FILE}" --output "${DUMP_FILE}" "${ENCRYPTED_FILE}"; then
+  log_msg error "age decrypt failed — clé identity invalide ?" "{\"identityFile\":\"${AGE_IDENTITY_FILE}\"}"
+  exit "${EXIT_AGE_FAIL}"
+fi
 
 # ---------- 4. pg_restore ----------
 # Drop & recreate la cible. CRITIQUE : ne JAMAIS pointer sur la prod
@@ -90,29 +114,30 @@ case "${PG_DB}" in
     : # OK — cible attendue
     ;;
   *)
-    echo "[guard] PG_DB=${PG_DB} ne contient pas '_dr' / '_test_' / 'interim_dev'" >&2
-    echo "[guard] refus : le restore drop la base cible. Renommer cible." >&2
-    exit 5
+    log_msg error "guard refusé : PG_DB ne contient pas '_dr' / '_test_' / 'interim_dev' — anti fat-finger prod" \
+      "{\"db\":\"${PG_DB}\"}"
+    exit "${EXIT_RESTORE_FAIL}"
     ;;
 esac
 
-echo "[pg_restore] drop+create ${PG_DB}@${PG_HOST}"
-PGPASSWORD="${PGPASSWORD:-}" psql \
+log_msg info "pg_restore drop+create" "{\"db\":\"${PG_DB}\",\"host\":\"${PG_HOST}\"}"
+if ! PGPASSWORD="${PGPASSWORD:-}" psql \
   --host="${PG_HOST}" --port="${PG_PORT}" --username="${PG_USER}" --dbname=postgres \
-  --quiet -c "DROP DATABASE IF EXISTS \"${PG_DB}\";" -c "CREATE DATABASE \"${PG_DB}\";" || {
-  echo "[psql] drop+create failed" >&2
-  exit 5
-}
+  --quiet -c "DROP DATABASE IF EXISTS \"${PG_DB}\";" -c "CREATE DATABASE \"${PG_DB}\";"; then
+  log_msg error "psql drop+create failed" "{\"db\":\"${PG_DB}\"}"
+  exit "${EXIT_RESTORE_FAIL}"
+fi
 
-echo "[pg_restore] restore → ${PG_DB}"
-PGPASSWORD="${PGPASSWORD:-}" pg_restore \
+log_msg info "pg_restore start" "{\"db\":\"${PG_DB}\"}"
+if ! PGPASSWORD="${PGPASSWORD:-}" pg_restore \
   --host="${PG_HOST}" --port="${PG_PORT}" --username="${PG_USER}" --dbname="${PG_DB}" \
   --no-owner --no-privileges --exit-on-error --jobs=4 --verbose \
-  "${DUMP_FILE}" 2>"${WORK_DIR}/pg_restore.stderr" || {
-  echo "[pg_restore] FAILED — see stderr:" >&2
+  "${DUMP_FILE}" 2>"${WORK_DIR}/pg_restore.stderr"; then
+  log_msg error "pg_restore failed" \
+    "{\"db\":\"${PG_DB}\",\"stderr_tail\":\"$(tail -5 "${WORK_DIR}/pg_restore.stderr" | tr '\n' ' ' | cut -c1-200)\"}"
   tail -50 "${WORK_DIR}/pg_restore.stderr" >&2
-  exit 5
-}
+  exit "${EXIT_RESTORE_FAIL}"
+fi
 
 END_TS=$(date -u +%s)
 DURATION=$((END_TS - START_TS))
@@ -130,5 +155,8 @@ ROW_COUNTS=$(PGPASSWORD="${PGPASSWORD:-}" psql \
     ) t" 2>/dev/null || echo "[]")
 
 # ---------- 6. Log JSON pour Promtail ----------
-echo "{\"event\":\"pg_restore.completed\",\"db\":\"${PG_DB}\",\"durationSeconds\":${DURATION},\"rowCounts\":${ROW_COUNTS},\"src\":\"${BACKUP_SRC}\"}"
-echo "[restore] OK en ${DURATION}s"
+# Format event-style (différent JSON Lines log_msg) — consommé par CI
+# pour assert_rto.
+printf '{"event":"pg_restore.completed","db":"%s","durationSeconds":%s,"rowCounts":%s,"src":"%s"}\n' \
+  "${PG_DB}" "${DURATION}" "${ROW_COUNTS}" "${BACKUP_SRC}"
+log_msg info "pg_restore ok" "{\"db\":\"${PG_DB}\",\"durationSeconds\":${DURATION}}"
