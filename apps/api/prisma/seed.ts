@@ -106,6 +106,80 @@ async function main(): Promise<void> {
   console.log('[seed] agency:', agency.id);
   console.log('[seed] workers:', worker1.id, worker2.id);
   console.log('[seed] client:', client.id);
+
+  await seedCantonHolidays(agency.id);
+}
+
+/**
+ * DETTE-036 — Seed des fériés cantonaux 2026-2028 pour les 26 cantons
+ * suisses. Idempotent : 2e exécution → upsert no-op.
+ *
+ * Audit log : 1 entrée AuditLogEntry CREATE par run de seed (traçabilité
+ * réglementaire — l'introduction d'une nouvelle version des fériés peut
+ * modifier les bulletins de paie générés ensuite).
+ */
+async function seedCantonHolidays(agencyId: string): Promise<void> {
+  const { SWISS_CANTONS, HOLIDAY_DATA_VERSION_VALID_FROM, computeHolidaysForCantonYear } =
+    await import('@interim/domain');
+
+  const years = [2026, 2027, 2028] as const;
+  const validFrom = new Date(HOLIDAY_DATA_VERSION_VALID_FROM);
+  let totalUpserted = 0;
+
+  for (const canton of SWISS_CANTONS) {
+    for (const year of years) {
+      const holidays = computeHolidaysForCantonYear(canton, year);
+      for (const h of holidays) {
+        await prisma.cantonHoliday.upsert({
+          where: {
+            canton_date_validFrom: {
+              canton,
+              date: new Date(h.date),
+              validFrom,
+            },
+          },
+          create: {
+            canton,
+            date: new Date(h.date),
+            label: h.label,
+            scope: h.scope,
+            paid: h.paid,
+            validFrom,
+            validTo: null,
+          },
+          update: {
+            label: h.label,
+            scope: h.scope,
+            paid: h.paid,
+          },
+        });
+        totalUpserted++;
+      }
+    }
+  }
+
+  // Audit trail (CO art. 958f conservation 10 ans).
+  await prisma.auditLogEntry.create({
+    data: {
+      agencyId,
+      action: 'CREATE',
+      actorId: 'system_seed',
+      actorRole: 'system',
+      entityType: 'canton_holidays',
+      entityId: HOLIDAY_DATA_VERSION_VALID_FROM,
+      diff: {
+        cantonsCount: SWISS_CANTONS.length,
+        yearsRange: [2026, 2028],
+        totalUpserted,
+        sourceVersion: HOLIDAY_DATA_VERSION_VALID_FROM,
+        seedTimestamp: new Date().toISOString(),
+      },
+    },
+  });
+
+  console.log(
+    `[seed] canton_holidays : ${String(totalUpserted)} rows upsert (26 cantons × 3 ans 2026-2028) + audit log`,
+  );
 }
 
 main()

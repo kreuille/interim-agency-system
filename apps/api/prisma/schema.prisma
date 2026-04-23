@@ -702,6 +702,42 @@ model SmsOptOut {
   @@map("sms_opt_outs")
 }
 
+// Référentiel des jours fériés par canton (DETTE-036). Versionné via
+// `validFrom`/`validTo` pour conserver l'historique en cas de changement
+// législatif (exigence audit 10 ans CO art. 958f).
+//
+// PK composite (canton, date, validFrom) : permet plusieurs versions du
+// même (canton, date) avec validités successives. Une lecture pour une
+// année donnée filtre `validFrom <= date <= COALESCE(validTo, '9999-12-31')`.
+//
+// Note : pas d'agencyId ici — c'est une donnée de **référence** publique
+// commune à toutes les agences (loi suisse).
+model CantonHoliday {
+  // Code canton ISO 3166-2:CH (2 lettres : GE, VD, FR, ..., TI). 26 cantons.
+  canton    String   @db.Char(2)
+  // Date civile du férié (UTC), ex: 2026-12-12 pour Escalade.
+  date      DateTime @db.Date
+  // Libellé FR/IT selon usage cantonal (ex. « Fête nationale », « Festa del lavoro »).
+  label     String
+  // `federal` (tous cantons, 7 fériés) ou `cantonal` (canton spécifique).
+  scope     String   @db.VarChar(16)
+  // Payé par l'employeur. Default true (CCT 2024-2028 §19).
+  paid      Boolean  @default(true)
+  // À partir de quelle date civile cette définition est en vigueur.
+  validFrom DateTime @db.Date
+  // Jusqu'à quand (null = toujours valide). Si modification de la
+  // législation cantonale, on créé un nouveau row avec validFrom = nouvelle
+  // date et on close l'ancien (validTo = nouvelle date - 1).
+  validTo   DateTime? @db.Date
+  // Audit timestamps (immutable une fois inséré sauf via OPS.cct-yearly-update).
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  @@id([canton, date, validFrom])
+  @@index([canton, date])
+  @@map("canton_holidays")
+}
+
 // Snapshot persistant de l'aggregate WorkerAvailability (1 par
 // agency × worker). Les slots sont stockés en JSONB pour rester
 // flexibles pendant l'évolution du modèle (RRULE, source, reason).
