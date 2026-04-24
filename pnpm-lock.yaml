@@ -184,6 +184,9 @@ importers:
       '@hookform/resolvers':
         specifier: ^3.9.1
         version: 3.10.0(react-hook-form@7.73.1(react@18.3.1))
+      '@interim/branding':
+        specifier: workspace:*
+        version: link:../../packages/branding
       '@interim/domain':
         specifier: workspace:*
         version: link:../../packages/domain
@@ -233,6 +236,9 @@ importers:
 
   apps/web-portal:
     dependencies:
+      '@interim/branding':
+        specifier: workspace:*
+        version: link:../../packages/branding
       '@interim/domain':
         specifier: workspace:*
         version: link:../../packages/domain
@@ -320,6 +326,19 @@ importers:
       vitest:
         specifier: ^2.1.4
         version: 2.1.9(@types/node@22.19.17)(happy-dom@15.11.7)
+
+  packages/branding:
+    dependencies:
+      '@fontsource/inter':
+        specifier: ^5.1.0
+        version: 5.2.8
+      '@fontsource/jetbrains-mono':
+        specifier: ^5.1.2
+        version: 5.2.8
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
 
   packages/contracts:
     devDependencies:
@@ -758,6 +777,12 @@ packages:
 
   '@firebase/util@1.10.0':
     resolution: {integrity: sha512-xKtx4A668icQqoANRxyDLBLz51TAbDP9KRfpbKGxiCAW346d0BeJe5vN6/hKxxmWwnZ0mautyv39JxviwwQMOQ==}
+
+  '@fontsource/inter@5.2.8':
+    resolution: {integrity: sha512-P6r5WnJoKiNVV+zvW2xM13gNdFhAEpQ9dQJHt3naLvfg+LkF2ldgSLiF4T41lf1SQCM9QmkqPTn4TH568IRagg==}
+
+  '@fontsource/jetbrains-mono@5.2.8':
+    resolution: {integrity: sha512-6w8/SG4kqvIMu7xd7wt6x3idn1Qux3p9N62s6G3rfldOUYHpWcc2FKrqf+Vo44jRvqWj2oAtTHrZXEP23oSKwQ==}
 
   '@google-cloud/firestore@7.11.6':
     resolution: {integrity: sha512-EW/O8ktzwLfyWBOsNuhRoMi8lrC3clHM5LVFhGvO1HCsLozCOOXRAlHrYBoE6HL42Sc8yYMuCb2XqcnJ4OOEpw==}
@@ -4444,6 +4469,10 @@ snapshots:
   '@firebase/util@1.10.0':
     dependencies:
       tslib: 2.8.1
+
+  '@fontsource/inter@5.2.8': {}
+
+  '@fontsource/jetbrains-mono@5.2.8': {}
 
   '@google-cloud/firestore@7.11.6':
     dependencies:

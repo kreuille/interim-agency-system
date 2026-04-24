@@ -1,0 +1,20 @@
+/*
+ * Fonts Helvètia Intérim — self-hostées via @fontsource (nLPD-safe).
+ *
+ * Pas de chargement direct depuis Google Fonts (fuite IP client vers US).
+ * Inclure DANS le layout racine Next.js :
+ *
+ *   // app/layout.tsx
+ *   import '@interim/branding/fonts.css';
+ *
+ * Les poids chargés correspondent à l'usage réel du design system :
+ * 400 (corps), 500 (medium actions), 600 (titres), 700 (titres forts).
+ */
+
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/500.css';
+@import '@fontsource/inter/600.css';
+@import '@fontsource/inter/700.css';
+
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/500.css';

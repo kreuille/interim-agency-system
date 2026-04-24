@@ -1,11 +1,11 @@
 {
-  "name": "Agence Intérim — Portail intérimaire",
-  "short_name": "Intérim",
-  "description": "Déclarez vos disponibilités et consultez vos missions.",
+  "name": "Helvètia Intérim — Portail intérimaire",
+  "short_name": "Helvètia",
+  "description": "Déclarez vos disponibilités, consultez vos missions, signez vos contrats.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f5f5f5",
-  "theme_color": "#0a4ea2",
+  "background_color": "#f5f4f1",
+  "theme_color": "#c8102e",
   "lang": "fr-CH",
   "icons": [
     {

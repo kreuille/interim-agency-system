@@ -1,40 +1,16 @@
 /*
- * Design system Helvètia Intérim
- * Inspiré de la palette suisse : neutres pierre + accent rouge drapeau CH.
- * Aucun framework CSS : variables + primitives utilitaires (.btn, .chip, .card, ...).
+ * Web-admin — primitives UI + shell layout.
+ *
+ * Les tokens (couleurs, rayons, ombres, shell) vivent dans
+ * `@interim/branding/tokens.css` (importé dans `layout.tsx`). Ce fichier
+ * ne contient QUE les primitives (.btn, .chip, .card, .app-sidebar, ...)
+ * et leurs spécialisations spécifiques à web-admin.
+ *
+ * Les fonts (Inter, JetBrains Mono) viennent de `@interim/branding/fonts.css`
+ * (self-hosté nLPD-safe).
+ *
+ * Modifier un token = éditer `packages/branding/src/tokens.css`, pas ici.
  */
-
-:root {
-  /* Palette swiss-precise */
-  --bg: #f5f4f1;
-  --surface: #ffffff;
-  --surface-2: #fafaf8;
-  --border: #e6e4df;
-  --border-strong: #d4d1ca;
-  --ink: #1a1a1a;
-  --ink-2: #3a3a3a;
-  --ink-3: #6b6864;
-  --ink-4: #9a9690;
-  --accent: #c8102e; /* CH flag red */
-  --accent-soft: #fbeaed;
-  --accent-ink: #8f0b20;
-  --ok: #157a4a;
-  --ok-soft: #e6f1ea;
-  --warn: #b26a00;
-  --warn-soft: #fbf0dc;
-  --info: #1f4f8b;
-  --info-soft: #e6eef8;
-
-  --radius: 4px;
-  --radius-lg: 6px;
-
-  --shadow-sm: 0 1px 0 rgba(0, 0, 0, 0.03);
-  --shadow-md: 0 1px 2px rgba(0, 0, 0, 0.05), 0 4px 12px rgba(0, 0, 0, 0.04);
-  --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.08), 0 12px 48px rgba(0, 0, 0, 0.1);
-
-  --sidebar-w: 236px;
-  --topbar-h: 52px;
-}
 
 * {
   box-sizing: border-box;
@@ -44,6 +20,8 @@
 
 html,
 body {
+  /* Stack Inter self-hostée via @interim/branding/fonts.css.
+     Fallback system si @fontsource n'est pas chargé (SSR pré-hydration). */
   font-family:
     'Inter',
     -apple-system,

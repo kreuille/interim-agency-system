@@ -1,12 +1,17 @@
 import type { ReactNode } from 'react';
+// Fonts self-hostées (Inter) — nLPD-safe, pas de Google Fonts direct.
+import '@interim/branding/fonts.css';
+// Tokens design system Helvètia Intérim (couleurs, rayons, ombres).
+import '@interim/branding/tokens.css';
 import { ServiceWorkerRegister } from './_components/ServiceWorkerRegister.js';
 import './globals.css';
 
 export const metadata = {
-  title: 'Agence Intérim — Portail intérimaire',
-  description: 'Déclarez vos disponibilités et consultez vos missions.',
+  title: 'Helvètia Intérim — Portail intérimaire',
+  description:
+    'Déclarez vos disponibilités, consultez vos missions, signez vos contrats — où que vous soyez.',
   manifest: '/manifest.webmanifest',
-  themeColor: '#0a4ea2',
+  themeColor: '#c8102e',
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

@@ -377,7 +377,7 @@ DETTE-001 (composite TS, reportée A.6) · DETTE-002 (repo GitHub) · DETTE-003 
 
 | Sous-sprint | Prompts totaux | Rédigés | Patron complet | Condensés | Non détaillés | Mergés |
 |-------------|----------------|---------|----------------|-----------|---------------|--------|
-| B.0 Fondations | 5 | 5 | B0.1 | B0.2, B0.3, B0.4 ✅, B0.5 | — | **B0.4** (PR #89) |
+| B.0 Fondations | 5 | 5 | B0.1 ✅ | B0.2, B0.3, B0.4 ✅, B0.5 | — | **B0.4** (PR #89), **B0.1** (PR #90) |
 | B.1 Onboarding | 5 | 5 | B1.1, B1.2 | B1.3, B1.4, B1.5 | — | — |
 | B.2 Durcissement multi-tenant | 5 | 0 | — | — | B2.1-B2.5 | — |
 | B.3 White-label + multi-cible | 3 | 0 | — | — | B3.1-B3.3 | — |
@@ -391,7 +391,8 @@ Note : 25 prompts catalogue + 4 OPS SaaS transversaux (churn-review, billing-rec
 
 | Prompt | Date | PR | Commit | Notes |
 |--------|------|----|----|-------|
-| **B0.4** Amendements CLAUDE.md SaaS | 2026-04-25 | #89 | (à compléter post-merge) | CLAUDE.md v1.0 → v1.1 : §10 nouveau (6 sous-sections éditeur SaaS), §3.5 durci (tenant-guard runtime + staff éditeur), §8 escalade SaaS (5 cas), §1 références ADR-0006 + brief 01b. Label `saas-review` ajouté à pr-template. **Débloque l'exécution des autres prompts B touchant du code.** |
+| **B0.4** Amendements CLAUDE.md SaaS | 2026-04-25 | #89 | `785af25` | CLAUDE.md v1.0 → v1.1 : §10 nouveau (6 sous-sections éditeur SaaS), §3.5 durci (tenant-guard runtime + staff éditeur), §8 escalade SaaS (5 cas), §1 références ADR-0006 + brief 01b. Label `saas-review` ajouté à pr-template. **Débloque l'exécution des autres prompts B touchant du code.** |
+| **B0.1** Branding + DNS + kit presse | 2026-04-25 | #90 | (post-merge) | Package `@interim/branding` créé (10 fichiers : tokens.css + colors.ts + typography.ts + fonts.css self-hostés @fontsource + 3 SVG). Consommé par web-admin + web-portal (rebrand bleu→rouge Helvetia). Doc DNS 7 sous-domaines pour fondateur. Kit presse 6 fichiers (palette WCAG, tagline, descriptions, bio). README racine rebrandé. **Fixe la fuite nLPD Google Fonts** au passage. |
 
 ### Règles d'exécution Sprint B
 

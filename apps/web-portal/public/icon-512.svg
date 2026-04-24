@@ -1,4 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="80" fill="#0a4ea2"/>
-  <text x="256" y="320" font-family="system-ui, sans-serif" font-size="220" font-weight="700" text-anchor="middle" fill="white">AI</text>
+  <rect width="512" height="512" rx="80" fill="#c8102e"/>
+  <rect x="96" y="216" width="320" height="80" rx="8" fill="#ffffff"/>
+  <rect x="216" y="96" width="80" height="320" rx="8" fill="#ffffff"/>
 </svg>

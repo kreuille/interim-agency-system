@@ -1,3 +1,15 @@
+/*
+ * Web-portal (PWA intérimaire) — primitives UI.
+ *
+ * Les tokens (couleurs, rayons, ombres) viennent de
+ * `@interim/branding/tokens.css` (importé dans `layout.tsx`).
+ * Fonts via `@interim/branding/fonts.css` (Inter self-hostée, nLPD-safe).
+ *
+ * Design volontairement minimaliste : touch-targets ≥ 48px, contrastes
+ * forts, légendes lisibles — le portail est utilisé par des intérimaires
+ * en situation mobile, parfois avec luminosité extérieure.
+ */
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -7,16 +19,17 @@
 html,
 body {
   font-family:
-    system-ui,
+    'Inter',
     -apple-system,
+    BlinkMacSystemFont,
     'Segoe UI',
     Roboto,
-    Helvetica,
-    Arial,
     sans-serif;
-  color: #1a1a1a;
-  background: #f5f5f5;
+  color: var(--ink);
+  background: var(--bg);
   line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 main {
@@ -26,7 +39,7 @@ main {
 }
 
 a {
-  color: #0a4ea2;
+  color: var(--accent-ink);
 }
 
 button {
@@ -39,18 +52,25 @@ button:disabled {
   opacity: 0.6;
 }
 
+/* Bouton primaire — rouge CH (aligné design system Helvètia). */
 .btn-primary {
-  background: #0a4ea2;
+  background: var(--accent);
   color: white;
   border: none;
   padding: 12px 16px;
-  border-radius: 6px;
+  border-radius: var(--radius-lg);
   font-weight: 500;
   width: 100%;
+  min-height: 48px; /* touch target mobile */
+}
+
+.btn-primary:hover:not(:disabled),
+.btn-primary:focus-visible {
+  background: var(--accent-ink);
 }
 
 .btn-primary:focus-visible {
-  outline: 3px solid #ffbf47;
+  outline: 3px solid var(--warn);
   outline-offset: 2px;
 }
 
@@ -67,33 +87,42 @@ button:disabled {
 
 .field input {
   padding: 12px;
-  border: 1px solid #999;
-  border-radius: 4px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
   font-size: 1rem;
+  min-height: 48px; /* touch target mobile */
+  background: var(--surface);
+}
+
+.field input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 .field .error {
-  color: #c40000;
+  color: var(--accent);
 }
 
 .banner {
   padding: 8px 12px;
-  border-radius: 4px;
+  border-radius: var(--radius);
   margin: 12px 0;
   font-size: 0.875rem;
 }
 
 .banner-warn {
-  background: #fff3cd;
-  color: #856404;
-  border: 1px solid #ffeeba;
+  background: var(--warn-soft);
+  color: var(--warn);
+  border: 1px solid rgba(178, 106, 0, 0.2);
 }
 
 .banner-info {
-  background: #e7f3fe;
-  color: #054a91;
-  border: 1px solid #b6dafd;
+  background: var(--info-soft);
+  color: var(--info);
+  border: 1px solid rgba(31, 79, 139, 0.2);
 }
+
+/* ===== Week grid (disponibilités) ===== */
 
 .week-grid {
   display: grid;
@@ -103,9 +132,9 @@ button:disabled {
 }
 
 .day-cell {
-  background: white;
-  border: 1px solid #ccc;
-  border-radius: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
   padding: 12px 4px;
   display: flex;
   flex-direction: column;
@@ -117,19 +146,19 @@ button:disabled {
 }
 
 .day-cell.available {
-  background: #c8e6c9;
-  border-color: #1b5e20;
+  background: var(--ok-soft);
+  border-color: var(--ok);
 }
 .day-cell.unavailable {
-  background: #ffcdd2;
-  border-color: #8b0000;
+  background: var(--accent-soft);
+  border-color: var(--accent);
 }
 .day-cell.mixed {
-  background: #fff3cd;
-  border-color: #856404;
+  background: var(--warn-soft);
+  border-color: var(--warn);
 }
 .day-cell.unknown {
-  background: white;
+  background: var(--surface);
 }
 
 .day-cell strong {
@@ -145,7 +174,7 @@ button:disabled {
 }
 
 .toolbar .me {
-  color: #666;
+  color: var(--ink-3);
 }
 
 .legend {
@@ -155,23 +184,27 @@ button:disabled {
   font-size: 0.75rem;
   margin-top: 16px;
   padding: 8px;
-  background: white;
-  border-radius: 6px;
+  background: var(--surface);
+  border-radius: var(--radius-lg);
 }
 
 .legend span {
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius);
 }
 .legend span.available {
-  background: #c8e6c9;
+  background: var(--ok-soft);
+  color: var(--ok);
 }
 .legend span.unavailable {
-  background: #ffcdd2;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
 }
 .legend span.mixed {
-  background: #fff3cd;
+  background: var(--warn-soft);
+  color: var(--warn);
 }
 .legend span.unknown {
-  background: #f0f0f0;
+  background: var(--border);
+  color: var(--ink-3);
 }
