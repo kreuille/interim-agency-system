@@ -5,6 +5,84 @@
 
 ---
 
+## Session 2026-04-23 22:00 — Debug Chrome preview + Fix B prom-client bundle (PR #87)
+
+- **Opérateur** : Claude Code (Sonnet 4.5) — déclencheur user "lance un debug dans Chrome de la solution complète".
+- **Sprint** : hors sprint (continuation post-Phase 2 preview).
+- **Branche Git** : `fix/web-admin-prom-client-bundle` (PR #87 mergée `43778ce`).
+- **Skills chargées** : Claude in Chrome (browser debug live).
+- **Objectif** : valider end-to-end les 4 URLs Cloud Run live de la PR #85 dans un vrai navigateur, identifier les régressions, fixer.
+
+### Déroulé
+
+1. **Debug Chrome web-admin** :
+   - Landing `/` rendue OK (carte Helvètia + bouton "Accéder au back-office").
+   - Click "Accéder au back-office" → navigation `/login` → **page blanche**.
+   - Console Chrome : `TypeError: n.uptime is not a function` (chunk 893-955f15fee741ae91.js) + `React error #423` (concatenation crash) en cascade.
+   - Stack trace pointe vers `app/login/page` qui hydrate un client component.
+
+2. **Diagnostic du bug** :
+   - `apps/web-admin/app/dashboard/workers/new/page.tsx` est `'use client'` et fait `import { CANTONS } from '@interim/shared'`.
+   - Le barrel `packages/shared/src/index.ts` ré-exportait `observability/prom-registry.js` qui importe `prom-client` (Node-only : `cluster`, `v8`, `process.uptime()`).
+   - Mes fallbacks webpack `cluster: false, v8: false, perf_hooks: false, ...` (PR #85) ont fait passer le **build-time** mais pas le **runtime** : `process.uptime()` est appelé sur un objet `process` polyfillé qui ne l'a pas.
+
+3. **Debug Chrome web-portal** : ✅ **fonctionne 100% end-to-end**.
+   - `/login` : form "Connexion intérimaire" rendu OK.
+   - Saisie email → click "Recevoir le lien" → mode dev affiche message bleu + bouton vert "Activer la session (mode dev)".
+   - `POST /api/auth/request-link` 200 OK + `POST /api/auth/verify` 200 OK.
+   - Navigation `/` après auth → dashboard "Mes disponibilités" avec planning 2 semaines, email user en haut droit, légende disponibilité.
+   - Pas d'erreur console. Le portail n'importe pas `@interim/shared` côté client → pas le bug prom-client.
+
+4. **Choix entre 2 fix possibles** présenté à l'user :
+   - **Fix A** (rapide, hacky) : alias webpack `'prom-client': false` côté client uniquement — ~3 min code + 10 min rebuild.
+   - **Fix B** (propre) : retirer `prom-registry` du barrel `@interim/shared`, ajouter sub-path explicite `@interim/shared/observability/prom-registry`, mettre à jour le seul consumer (`apps/worker/src/observability/business-metrics.ts`) — ~15 min code + 10 min rebuild.
+   - User choisit **Fix B**.
+
+5. **Implémentation Fix B** (PR #87 `43778ce`, 3 fichiers, 20 lignes) :
+   - `packages/shared/src/index.ts` : retire `export * from './observability/prom-registry.js'` + commentaire explicatif pointant vers le sub-path.
+   - `packages/shared/package.json` : ajoute `exports['./observability/prom-registry']` pour la résolution TS du sub-path.
+   - `apps/worker/src/observability/business-metrics.ts` : seul consumer dans le code applicatif (l'API ne l'utilise pas) — change l'import pour le sub-path.
+   - Audit `Grep prom-registry|createPromRegistry|hashAgencyId|FORBIDDEN_LABELS|assertLabelHygiene|validateLabelHygiene` : seulement 2 fichiers concernés (`business-metrics.ts` + `business-metrics.test.ts` qui passe par le `.js` local). Surface minimale.
+
+6. **Validation** :
+   - `pnpm typecheck` : 9 packages OK.
+   - `pnpm -F @interim/worker test` : 40/40 OK (incl. business-metrics avec nouveau sub-path).
+   - Web-admin Docker rebuild → push Artifact Registry → `gcloud run deploy` revision 00002.
+   - Verify Chrome : `/login` rendu OK (form pré-rempli marie.bovay), click "Se connecter" → **dashboard back-office Helvètia complet** :
+     - Header "Helvètia Intérim · LAUSANNE · VD"
+     - Sidebar : Tableau de bord, Propositions, Intérimaires, Clients, Relevés d'heures
+     - KPIs S17 · 14 missions · 612h · CHF 27'840 · badge Conforme CCT
+     - 3 alertes conformité (LSE 58j, propositions sans réponse, barèmes CCT 2026)
+     - Activité MovePlanner temps réel (200 OK, 12 webhooks dernière 2 min)
+     - User dropdown marie.bovay administrateur agence
+   - Zéro erreur console.
+
+7. **CI verte** sur PR #87 (10/10 checks). Squash merge + delete branch.
+
+### Livrables
+
+- **PR #87 `43778ce`** : Fix B (3 fichiers, 20 lignes net).
+- **Cloud Run web-admin revision 00002** : déployée et fonctionnelle.
+- **Preview live 100% utilisable** : portail intérimaire + back-office cliquables, démo possible.
+
+### Décisions
+
+- **Fix B plutôt que Fix A** : sub-path explicite est le pattern correct pour séparer code Node-only du code partageable. Pattern à suivre pour futurs ajouts à `@interim/shared`.
+- **Pas de SESSION-LOG/PROGRESS update directement avec Fix B** : ce chore-là est dans une PR séparée pour garder les changements de code isolés des changements de docs orchestration.
+
+### Dette ouverte / suite
+
+- **Aucune dette nouvelle** ouverte par cette session. Le bug fixé était en réalité une dette implicite introduite par PR #85 (les fallbacks webpack masquaient le vrai problème de design). DETTE-042 (wiring proposals/timesheets/ged/webhooks) reste ouverte, inchangée.
+- **Pattern à appliquer** : si un futur module Node-only est ajouté à `packages/shared`, NE PAS l'ajouter au barrel `index.ts`. Le sortir en sub-path comme `prom-registry`.
+
+### Prochain prompt
+
+**Retour à STOP code-only** — actions externes inchangées (A0.4, A5.5, A6.6, A6.7).
+
+La preview live est maintenant **prête pour démo réelle** (showcasing aux parties prenantes, smoke tests UI/API). Aucun gap fonctionnel restant côté frontend.
+
+---
+
 ## Session 2026-04-23 20:00 — Wiring DI minimal (→ DETTE-042 pour reste) + Phase 2 GCP preview live
 
 - **Opérateur** : Claude Code (Sonnet 4.5) — déclencheur : user "je cherche la version prod live pour tester" → session orientée déploiement preview rapide après négociation scope.
