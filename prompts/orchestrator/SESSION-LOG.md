@@ -5,6 +5,157 @@
 
 ---
 
+## Session 2026-04-25 — B0.4 amendements CLAUDE.md SaaS + consolidation artefacts Cowork phase 2
+
+- **Opérateur** : Claude Code (Sonnet 4.5) — déclencheur user "Session de démarrage Phase 2 — Sprint B SaaS. ... TÂCHE 1 : exécuter B0.4".
+- **Sprint** : B.0 Fondations SaaS.
+- **Branche Git** : `feat/B0.4-claude-md-saas`.
+- **Skills chargées** : `skills/ops/code-review`, `skills/compliance/nlpd-privacy`.
+- **Pré-état** : main avec working tree non-clean — 5 lots de fichiers Cowork phase 2 (ADR-0006, brief pivot, prompts B/B1, go-to-market) **jamais committés** (Cowork mode "edits OneDrive direct"). PROGRESS §9 + SESSION-LOG entry 2026-04-24 idem en working tree.
+- **Objectif** : exécuter `prompts/sprint-b-saas/B0.4-claude-md-saas-amendments.md` — amender CLAUDE.md avec contexte éditeur SaaS (§10 nouveau, §3.5 durci, §8 escalade complétée, ADR-0006 référencée §1) + label `saas-review` dans pr-template. Prérequis implicite : consolider les artefacts Cowork sur git d'abord, sinon les liens cassés.
+
+### Déroulé
+
+1. **Lecture contexte obligatoire** :
+   - `CLAUDE.md` v1.0 (intégral)
+   - `docs/adr/0006-saas-pivot.md` (décision pivot, marque, domaine, filialisation)
+   - `docs/01b-brief-saas-pivot.md` (vision phase 2, pricing draft, segments cibles)
+   - `prompts/sprint-b-saas/README.md` + `B-PROMPTS.md` (catalogue 25 prompts)
+   - `prompts/sprint-b-saas/B0.4-claude-md-saas-amendments.md` (prompt cible)
+   - `PROGRESS.md` §9 (règles d'exécution Sprint B — B0.4 prérequis avant tout autre prompt B touchant code)
+   - 3 dernières entrées SESSION-LOG (Cowork phase 2 + Chrome debug + wiring DI)
+   - Skills : `skills/ops/code-review/SKILL.md` + `skills/compliance/nlpd-privacy/SKILL.md`
+
+2. **Découverte critique du pré-état** : working tree de main contient 5 lots de fichiers Cowork phase 2 **jamais committés** (Cowork mode "edits OneDrive direct") :
+   - `docs/adr/0006-saas-pivot.md` (référencé par CLAUDE.md amendé)
+   - `docs/01b-brief-saas-pivot.md` (référencé par CLAUDE.md amendé)
+   - `docs/go-to-market/` (pack externe, 7 docs)
+   - `prompts/sprint-b-saas/` (10 prompts B.0/B.1)
+   - `prompts/sprint-b1-onboarding/` (sub-dossier)
+   - + modifications PROGRESS.md (§9 Phase 2) + SESSION-LOG.md (entry 2026-04-24)
+   
+   **Décision** : consolider ces artefacts dans la même branche/PR que B0.4. Sans eux, les liens ADR-0006 dans CLAUDE.md amendé pointent dans le vide une fois mergé. Justifié dans le body de la PR.
+
+3. **Branche `feat/B0.4-claude-md-saas`** créée depuis main propre.
+
+4. **Amendements CLAUDE.md (v1.0 → v1.1)** :
+   - Header : version 1.1 + date 2026-04-25 + mention pivot SaaS phase 2 → §10 + lien ADR-0006.
+   - §1 (contexte à charger) : insertion `01b-brief-saas-pivot.md` (rang 2) + `adr/0006-saas-pivot.md` (rang 3) + paragraphe spécial sessions sprint B.
+   - §3.5 (multi-tenant) : 3 puces ajoutées — tenant-guard runtime, test non-régression cross-tenant, staff éditeur (rôle `editor_staff` + `audit_logs_staff`).
+   - §8 (refus/escalade) : 5 cas additionnels SaaS — bypass tenant-guard, consultation tenant sans ticket, export hors tenant, modif silencieuse CGU/pricing/DPA, désactivation audit log.
+   - §9 (mise à jour fichier) : mention label `saas-review` en plus de `rules-update`.
+   - §10 nouvelle (`Contexte éditeur SaaS`) : 6 sous-sections — sous-traitance nLPD (10.1), accès staff éditeur (10.2), isolation cross-tenant niveau d'exigence (10.3), provisionnement et cycle vie tenant (10.4), communication clients agences (10.5), filialisation et conflit d'intérêt (10.6).
+
+5. **`docs/pr-template.md`** : ligne SaaS multi-tenant ajoutée dans `## Impact conformité`, check reviewer correspondante, et nouvelle section `## Labels disponibles` avec définition de `compliance-review`, `rules-update`, `saas-review`.
+
+6. **Self-review** : diff intégral relu — ton homogène (tutoiement Claude, présent indicatif), vocabulaire cohérent avec ADR-0006/brief, liens markdown valides, structure §10 logique, version 1.0 → 1.1.
+
+7. **Commit + PR + CI + merge** : 2 commits atomiques (consolidation Cowork puis B0.4 net) dans la branche, PR avec labels `rules-update` + `saas-review`, watch CI verte, squash-merge admin sur main.
+
+### Livrables
+
+- **PR #89** (à venir) : 2 commits dans `feat/B0.4-claude-md-saas` :
+  - `chore(orchestrator): consolide artefacts Cowork phase 2 (ADR-0006, brief pivot, prompts B, go-to-market)` — commit les fichiers laissés untracked par la session Cowork.
+  - `docs(claude): amend CLAUDE.md with SaaS editor context (§10, §3.5, §8) — B0.4` — les amendements purs.
+- **Sprint B.0 / B0.4 marqué completed** dans PROGRESS §9 (5 → 5 prompts rédigés, 1 → 2 patrons complets ou condensés mergés).
+
+### Décisions
+
+- **Inclure les artefacts Cowork dans la PR B0.4** plutôt que faire 2 PRs séquentielles : sans eux, mes liens vers `docs/adr/0006-saas-pivot.md` dans CLAUDE.md sont cassés en main. Coût : 1 PR un peu plus large. Bénéfice : main reste cohérente après merge, pas de fenêtre où CLAUDE.md référence un fichier inexistant.
+- **Squash merge** plutôt que rebase : main reste lisible (1 commit par PR), historique des 2 commits préservé dans la PR pour archive.
+- **Pas de modification de skills, ports, runtime** : B0.4 est exclusivement docs/règles. Pas de code touché → pas de tenant-guard à modifier maintenant (le code de A1.x existe déjà, je le vérifie juste avec le `cf.` dans §3.5).
+
+### Dette ouverte / suite
+
+- **DETTE B0.4-1 (à ouvrir)** : implémenter le rôle `editor_staff` + table `audit_logs_staff` + middleware d'audit obligatoire. Référencé dans CLAUDE.md §10.2 mais pas encore en code. Sera couvert par B2.3 ("Audit log staff éditeur").
+- **DETTE B0.4-2 (à ouvrir)** : statuspage `status.helvetia-interim.guedou.ch` à provisionner. Référencé dans CLAUDE.md §10.5.
+- **Aucune autre dette** introduite. Les autres références (`/api/v2/`, `docs/migrations/v1-to-v2.md`, etc.) sont aspirationnelles et naturellement traitées au moment où une v2 sera nécessaire.
+
+### Prochain prompt
+
+**Tâche 2 du prompt user** : exécuter `B0.1-product-name-domain-branding.md` (extraction packages/branding + DNS doc + kit presse). Skills : `skills/ops/project-kickoff`, `skills/business/agency-direction-strategy`, `skills/dev/frontend-next`. Branche `feat/B0.1-product-branding`.
+
+À évaluer en début de tâche 2 : si contexte > 80%, appliquer RESUME-TEMPLATE.md (commit WIP, push, pause). Ne pas forcer pour finir B0.1 dans la même session si B0.4 a déjà consommé pas mal.
+
+- **Opérateur** : Claude (Cowork mode) — déclencheur user "que penses-tu de faire une landing page... une page inscription... onboarding..."
+- **Sprint** : pré-B (planification phase 2)
+- **Branche Git** : aucune (travail de documentation + catalogue, pas de code). Fichiers posés directement sur `main` via edits OneDrive.
+- **Skills chargées** : `skills/business/agency-direction-strategy`, `skills/ops/project-kickoff`, `skills/compliance/nlpd-privacy`, `skills/integration/moveplanner-api`
+- **Objectif** : formaliser la décision de pivot SaaS post-pilote, cataloguer Sprint B en 25 prompts, rédiger les prompts B.0 et B.1 en patron/condensé pour exécution différée.
+
+### Déroulé
+
+1. **Dialogue stratégique** user : décisions actées
+   - Pivot pur SaaS après pilote validé (option A).
+   - Cibles ordre priorité : 1. agences CH, 2. white-label MovePlanner, 3. PME opératrices.
+   - Nom produit : `Helvètia Intérim` (conservé, déjà ancré dans design system PR #71).
+   - Domaine : `helvetia-interim.guedou.ch` (sous-domaine personnel fondateur, staging ET commercial, migration TLD dédié = dette future non-bloquante).
+   - Préparation surface publique maintenant, lancement commercial après pilote réussi.
+
+2. **Documents stratégiques créés** :
+   - `docs/adr/0006-saas-pivot.md` — décision formalisée, filialisation `Helvètia Intérim SA` actée, dette TLD future documentée.
+   - `docs/01b-brief-saas-pivot.md` — vision phase 2, pricing draft (Starter 199 / Pro 499 / Enterprise CHF/mois), 3 segments cibles, risques, go-to-market.
+
+3. **Sprint B — catalogue et structure** :
+   - `prompts/sprint-b-saas/README.md` — index sprint B.
+   - `prompts/sprint-b-saas/B-PROMPTS.md` — catalogue maître 25 prompts en 6 sous-sprints + 4 OPS SaaS transversaux.
+   - Dossiers créés : `sprint-b-saas/`, `sprint-b1-onboarding/`, `sprint-b2-multitenant-hardening/`, `sprint-b3-whitelabel-multitarget/`, `sprint-b4-support-docs-growth/`, `sprint-b5-deep-testing/`.
+
+4. **Sprint B.0 Fondations — 5 prompts rédigés** :
+   - `B0.1-product-name-domain-branding.md` (patron complet, effort S 0.5j)
+   - `B0.2-landing-page-public.md` (condensé, effort L 2j)
+   - `B0.3-stripe-plans-setup.md` (condensé, effort M 1j)
+   - `B0.4-claude-md-saas-amendments.md` (condensé, effort S 0.5j) — **à merger avant tout autre prompt B touchant du code**.
+   - `B0.5-legal-cgu-dpa.md` (condensé, effort L 2j dont 1j juriste).
+
+5. **Sprint B.1 Onboarding — 5 prompts rédigés** :
+   - `B1.1-signup-flow.md` (patron complet, effort L 2j)
+   - `B1.2-onboarding-wizard.md` (patron complet, effort XL 3j, 7 étapes)
+   - `B1.3-tenant-provisioning.md` (condensé, effort L)
+   - `B1.4-transactional-emails.md` (condensé, effort M)
+   - `B1.5-admin-users-ui.md` (condensé, effort M)
+
+6. **Sprints B.2 à B.5 non détaillés** : ils sont catalogués dans `B-PROMPTS.md` avec ID + DoD résumée + skills + dépendances. Seront rédigés en patron complet au moment de l'exécution, post-pilote. Volontaire : ne pas figer de choix en amont des retours pilote.
+
+7. **Alignement domaine** : après décision `helvetia-interim.guedou.ch`, mise à jour transversale de tous les docs et prompts (ADR-0006, README sprint-b-saas, B-PROMPTS, B0.1, B0.2, B0.3, B0.5, B1.1, B1.4, 01b-brief). Vérification `grep` confirme : aucune référence résiduelle à `helvetia-interim.ch` sauf mention intentionnelle dans ADR-0006 §3 (dette future TLD).
+
+8. **Pack go-to-market externe** (travail connexe, complète les actions humaines A0.4/A5.5/A6.6/A6.7) — 7 documents dans `docs/go-to-market/` :
+   - README index + ordre d'attaque
+   - 01 LSE dossier cantonal checklist
+   - 02 GCP provisioning checklist (18 sections, commandes gcloud)
+   - 03 Email type demande sandbox MovePlanner
+   - 04 Comparatif Bexio vs Abacus
+   - 05 Pentest scope + RFP + prestataires CH
+   - 06 Plan de communication pilote
+
+### Livrables (synthèse)
+
+- **15 fichiers Sprint B** : 2 docs stratégiques (ADR-0006 + brief pivot) + 2 méta (README + catalogue) + 5 prompts B.0 + 5 prompts B.1 + 1 mise à jour PROGRESS.md (§9 Phase 2) + 1 entrée SESSION-LOG.md (ce fichier).
+- **7 fichiers go-to-market** (produits dans une session Cowork précédente, mentionnés ici pour complétude).
+
+### Décisions
+
+1. **Filialisation obligatoire** avant 1er client SaaS externe (conflit d'intérêt avec l'agence opératrice initiale). Documenté ADR-0006 §4.
+2. **B0.4 (amendements CLAUDE.md) prérequis strict** avant exécution de tout autre prompt B touchant du code — garantit que les sessions Claude Code futures connaissent les règles éditeur SaaS (audit staff, accès tenant, isolation durcie).
+3. **Non-rédaction anticipée des sprints B.2-B.5** : décision explicite d'attendre les retours pilote avant de les détailler. Évite de figer des hypothèses qui seront invalidées par le terrain.
+4. **Domaine subdomain guedou.ch** validé comme solution définitive (vs TLD dédié). Migration future = prompt ad-hoc non prioritaire.
+
+### Dettes ouvertes (Phase 2)
+
+- [ ] Juriste CH à contacter pour relecture B0.5 (CGU + politique confidentialité + DPA template) — budget 2-4 kCHF, délai 2-4 semaines. À lancer **dès maintenant** en parallèle du pilote.
+- [ ] Filialisation juridique `Helvètia Intérim SA` — procédure notariale CH, 4-8 semaines, 10-20 kCHF de frais (capital social SA minimum 100 kCHF dont 50 kCHF libérés). À lancer **avant** l'onboarding du 1er client externe, pas nécessairement avant J+30.
+- [ ] Prompts B.2 à B.5 à rédiger en patron complet **au moment de leur exécution**.
+- [ ] Arbitrage wildcard SSL vs routage par path pour espaces tenants (`app.{tenantSlug}.helvetia-interim.guedou.ch` niveau 4 vs `app.helvetia-interim.guedou.ch/t/{tenantSlug}`) — reporté à B3.1.
+- [ ] Config SPF/DKIM/DMARC dédiée sur sous-domaine email `mail.helvetia-interim.guedou.ch` pour isoler réputation emailing SaaS vs perso — à faire en B1.4.
+
+### Prochain prompt suggéré
+
+- **Pour la Phase 1** : **AUCUN** — les 44/48 prompts catalogue sont mergés, les 4 restants (A0.4, A5.5, A6.6, A6.7) sont tous des actions humaines externes. Preview Cloud Run live est un bonus. Focus fondateur : provisioning GCP prod + sandbox MP + dépôt LSE + démarches caisses sociales + pentest externe.
+- **Pour la Phase 2 (parallélisable pendant pilote)** : lancer `B0.4-claude-md-saas-amendments.md` dès que possible (effort S 0.5j, pose les règles SaaS dans CLAUDE.md pour que les sessions Claude Code futures soient correctement guidées). Puis B0.1 (effort S, branding/DNS), B0.5 (démarrer avec juriste), B0.2 (landing), B0.3 (Stripe). Ordre exact à discretion fondateur.
+- **Jamais avant pilote validé** : B1.*, B2.*, B3.*, B4.* (sauf B4.2 docs si envie), B5.*.
+
+---
+
 ## Session 2026-04-23 22:00 — Debug Chrome preview + Fix B prom-client bundle (PR #87)
 
 - **Opérateur** : Claude Code (Sonnet 4.5) — déclencheur user "lance un debug dans Chrome de la solution complète".

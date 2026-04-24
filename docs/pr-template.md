@@ -36,6 +36,7 @@
 - **LTr** : aucun / détail
 - **nLPD** : aucun / détail
 - **LSE — audit log** : écriture confirmée oui/non
+- **SaaS multi-tenant** (phase 2) : touche tenant-guard / cross-tenant ? aucun / détail (label `saas-review` requis si oui — voir CLAUDE.md §10)
 
 ## Impact sécurité
 - Secrets : aucun changement / détail
@@ -57,3 +58,11 @@
 - [ ] Tests couvrent chemin heureux + erreurs métier
 - [ ] Logs pas de PII en clair
 - [ ] Docs à jour si API publique touchée
+- [ ] Si label `saas-review` : tenant-guard non bypassé, audit_logs_staff écrit si accès tenant, isolation testée (cf. CLAUDE.md §10)
+
+---
+
+## Labels disponibles
+- `compliance-review` : touche LSE/CCT/LTr/nLPD/paie — exige validation juriste/DPO (cf. CLAUDE.md §2.5).
+- `rules-update` : modifie CLAUDE.md ou règles transversales — exige lead tech + PO (cf. CLAUDE.md §9).
+- `saas-review` : phase 2 SaaS — touche multi-tenant, audit staff éditeur, onboarding, billing, white-label, ou tout flow tenant-facing. Exige checklist §10.
