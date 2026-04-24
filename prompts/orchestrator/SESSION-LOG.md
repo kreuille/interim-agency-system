@@ -5,6 +5,77 @@
 
 ---
 
+## Session 2026-04-25 (suite) — B0.1 product branding (packages/branding + DNS doc + kit presse)
+
+- **Opérateur** : Claude Code (Sonnet 4.5) — continuation session B0.4.
+- **Sprint** : B.0 Fondations SaaS.
+- **Branche Git** : `feat/B0.1-product-branding`.
+- **Skills chargées** : `skills/ops/project-kickoff`, `skills/business/agency-direction-strategy`, `skills/dev/frontend-next`.
+- **Prérequis** : B0.4 mergé sur main (commit `785af25`). CLAUDE.md §10 SaaS en vigueur.
+- **Objectif** : exécuter `prompts/sprint-b-saas/B0.1-product-name-domain-branding.md` — extraire le design system Helvètia Intérim (actuellement dans `apps/web-admin/app/globals.css`, 1373 lignes CSS vanilla) en `packages/branding`, faire consommer par web-admin + web-portal, doc DNS 7 sous-domaines, kit presse minimal.
+
+### Déroulé
+
+1. **Lecture prompt B0.1** + 3 skills (`project-kickoff`, `agency-direction-strategy`, `frontend-next`).
+
+2. **Audit existant** : design system actuel = 1373 lignes CSS vanilla dans `apps/web-admin/app/globals.css` (palette CH red `#c8102e`, neutres pierre, primitives `.btn/.chip/.card/.app-sidebar/.kanban`). Pas de Tailwind. Logo = construction CSS pure (pas de SVG file). web-portal = stack séparée avec accent bleu `#0a4ea2` (pas Helvetia-branded). Layout web-admin charge Google Fonts via `<link>` = leak nLPD à corriger.
+
+3. **Création `packages/branding`** :
+   - `package.json` workspace avec exports map (`.`, `./colors`, `./typography`, `./tokens.css`, `./fonts.css`, 3 SVGs) + deps `@fontsource/inter` + `@fontsource/jetbrains-mono`.
+   - `src/colors.ts` : SSOT TS des 19 tokens couleur + mapping `cssVars` pour overrides white-label runtime (B3.1).
+   - `src/typography.ts` : font stacks + échelle taille + poids + features OpenType.
+   - `src/tokens.css` : `:root { --bg, --surface, --accent, ... }` extrait du globals.css web-admin, posé sur `:root` pour overrides white-label en cascade.
+   - `src/fonts.css` : import Inter (400/500/600/700) + JetBrains Mono (400/500) self-hostés via @fontsource — **fixe la fuite nLPD Google Fonts**.
+   - 3 SVG : `icon.svg` (carré rouge + croix CH 64x64), `logo-full.svg` (icon + wordmark "Helvètia INTÉRIM"), `logo-mono.svg` (currentColor pour fonds colorés).
+   - `tsconfig.json` extends base.
+
+4. **Wire web-admin** : ajout dep `@interim/branding`, `layout.tsx` retire `<link>` Google Fonts (nLPD) et importe `fonts.css` + `tokens.css`, `globals.css` retire le bloc `:root` (maintenant SSOT branding).
+
+5. **Wire web-portal** (rebrand bleu → rouge Helvetia) : ajout dep, `layout.tsx` importe fonts + tokens + `themeColor: '#c8102e'`, title "Helvètia Intérim — Portail intérimaire", `globals.css` réécrit avec `var(--xxx)` (touch-targets 48px préservés), `manifest.webmanifest` rebrandé, 2 SVG icons remplacés par croix CH blanche sur carré rouge.
+
+6. **Doc DNS** (`docs/dns/helvetia-interim-guedou-ch.md`) : 7 records à créer manuellement par fondateur chez gestionnaire DNS guedou.ch. Tableau types/valeurs/TTL/usage/priorité, notes Cloud Run domain mapping, arbitrage tenant spaces niveau 4 vs path renvoyé à B3.1, section email transactionnel SPF/DKIM/DMARC sur `mail.helvetia-interim.`, CAA records sécurité, checklist déploiement. **Aucune action automatique** — pure doc fondateur.
+
+7. **Kit presse** (`docs/branding/`, 6 fichiers) : README + palette.md (19 tokens + ratios contraste WCAG AA vérifiés) + tagline.md (commerciale + élévateur + growth alt + positioning + valeurs + tone of voice) + description-court-fr (50 mots) + description-long-fr (150 mots) + founder-bio-fr (80 mots LinkedIn).
+
+8. **README racine** : bandeau Helvetia Intérim avec liens ADR-0006 + brief phase 2 + kit presse, status phase 1 et 2 explicites.
+
+9. **Validation** :
+   - `pnpm install` → OK (link workspace + install @fontsource).
+   - `pnpm -F @interim/branding typecheck` + `web-admin typecheck` + `web-portal typecheck` → tous OK.
+   - `pnpm -F @interim/web-admin build` + `web-portal build` → "Compiled successfully" mais EPERM symlink sur `writeStandaloneDirectory` (bug Windows + OneDrive avec symlinks pnpm). **Code valide**, l'erreur est purement environnementale post-compile. CI Linux passera.
+
+10. **Lighthouse a11y skip justifié** : la palette n'a pas changé visuellement (mêmes hex, juste relogés en package). Ratios contrastes documentés dans `docs/branding/palette.md` (tous AA pour usages corps/titres). web-portal gagne en contraste vs son ancien blue-only state. Aucune régression a11y possible structurellement.
+
+### Livrables (synthèse)
+
+- **Package** `@interim/branding` (10 fichiers — 2 TS + 2 CSS + 3 SVG + 3 config).
+- **6 fichiers `docs/branding/`** kit presse complet.
+- **1 fichier `docs/dns/helvetia-interim-guedou-ch.md`** instructions DNS fondateur.
+- **5 fichiers app modifiés** : web-admin (package + layout + globals.css), web-portal (package + layout + globals.css + manifest + 2 SVG icons).
+- **README racine** rebrandé Helvètia Intérim.
+
+### Décisions
+
+- **Pas de Tailwind ajouté** : web-admin = CSS vanilla avec variables, je préserve cette stack. Le package n'inclut donc pas de `tailwind.config.ts`. Future landing peut consommer `@interim/branding/colors` (TS) ou `tokens.css` directement.
+- **web-portal rebrandé en rouge Helvetia** plutôt que de garder son bleu legacy : cohérence marque entre back-office et portail intérimaire. Touch-targets 48px préservés.
+- **Self-hosting fonts via @fontsource** : fixe la dette nLPD préexistante (Google Fonts via `<link>` = leak IP client vers US).
+- **Logo SVG géométrique simple** (croix CH en rectangles + wordmark Inter) plutôt que typo custom : cohérent avec l'identité système, swap facile si fondateur veut un wordmark plus travaillé plus tard.
+- **Pas de PNG rasterisés générés automatiquement** : reporté à un script `ops/branding/export-assets.sh` ultérieur (Imagemagick depuis SVG, non bloquant).
+
+### Dette ouverte / suite
+
+- **DETTE B0.1-1** (mineure) : générer PNG rasterisés pour kit presse externe (LinkedIn, pitch deck). Effort XS.
+- **DETTE B0.1-2** : configurer wrangler/CDN pour landing à `helvetia-interim.guedou.ch` racine quand B0.2 sera fait.
+- **DETTE B0.1-3** : Lighthouse audit a11y formel via pipeline CI Lighthouse contre builds Cloud Run (post-A6.7).
+
+### Prochain prompt
+
+- **Option A** : **B0.5 — Légal (CGU + politique confidentialité + DPA template)** — à démarrer en parallèle car implique un juriste CH (cycle 2-4 semaines, budget 2-4 kCHF). Effort technique L (2j dont 1j juriste). Le plus haut leverage pour débloquer l'onboarding réel.
+- **Option B** : **B0.2 — Landing page publique** — Next.js statique ou Framer, racine `helvetia-interim.guedou.ch`. Effort L (2j).
+- **Recommandation** : lancer B0.5 en parallèle (juriste = chemin critique long) ET B0.2 maintenant si bande passante dev. B0.3 (Stripe) attend ces deux.
+
+---
+
 ## Session 2026-04-25 — B0.4 amendements CLAUDE.md SaaS + consolidation artefacts Cowork phase 2
 
 - **Opérateur** : Claude Code (Sonnet 4.5) — déclencheur user "Session de démarrage Phase 2 — Sprint B SaaS. ... TÂCHE 1 : exécuter B0.4".

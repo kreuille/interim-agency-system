@@ -1,9 +1,16 @@
-# Agence d'Intérim — Système d'information
+# Helvètia Intérim — SI / SaaS pour agences d'intérim suisses
 
-Système d'information pour une **agence suisse de travail temporaire**, nativement conforme au droit suisse (LSE, CCT Location de services, LTr, nLPD) et intégré par API à la plateforme **MovePlanner**.
+> 🇨🇭 **Helvètia Intérim** — Le SI natif suisse pour agences de travail temporaire.
+> **Phase 1** (actuelle) : pilote opérationnel avec l'agence du fondateur.
+> **Phase 2** (post-pilote) : pivot SaaS multi-agences — voir [ADR-0006](docs/adr/0006-saas-pivot.md) + [brief phase 2](docs/01b-brief-saas-pivot.md).
+> **Marque** : Helvètia Intérim. **Domaine** : https://helvetia-interim.guedou.ch
+> **Kit presse** : [`docs/branding/`](docs/branding/)
 
-> **Statut** : bootstrap — structure documentaire posée, dev pas encore démarré.
-> **Date** : 2026-04-21
+Système d'information pour **agences suisses de travail temporaire**, nativement conforme au droit suisse (LSE, CCT Location de services, LTr, nLPD) et intégré par API aux plateformes de planification clients (MovePlanner d'abord). Multi-tenant par design dès A0.5.
+
+> **Statut pilote** : go-live prévu 2026-Q2 (44/48 prompts catalogue mergés ; reste A0.4/A5.5/A6.6/A6.7 = actions externes).
+> **Statut SaaS** : Sprint B amorcé (B0.4 mergé — règles éditeur SaaS posées ; B0.1 branding en cours).
+> **Date** : 2026-04-25
 
 ---
 
