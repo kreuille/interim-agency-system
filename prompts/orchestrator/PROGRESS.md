@@ -355,7 +355,61 @@ DETTE-001 (composite TS, reportée A.6) · DETTE-002 (repo GitHub) · DETTE-003 
 
 ---
 
-## 9. Notes de resynchronisation 2026-04-23
+## 9. Phase 2 — Sprint B SaaS (catalogued, pending pilote validation)
+
+> **Décision stratégique** : pivot pur SaaS post-pilote. Voir `docs/adr/0006-saas-pivot.md`.
+> **Vision complète** : `docs/01b-brief-saas-pivot.md`.
+> **Catalogue** : `prompts/sprint-b-saas/B-PROMPTS.md` (25 prompts en 6 sous-sprints).
+> **Statut** : **catalogue posé, exécution différée** jusqu'à validation pilote Phase 1 (J+30 post go-live).
+
+### Décisions figées
+
+| Élément | Valeur | Source |
+|---------|--------|--------|
+| Nom produit | Helvètia Intérim | Design system PR #71 + ADR-0006 |
+| Domaine | `helvetia-interim.guedou.ch` (staging ET commercial) | Décision fondateur 2026-04-24 |
+| Cibles ordre priorité | 1. Agences CH → 2. White-label MP → 3. PME | Décision fondateur 2026-04-24 |
+| Pricing draft | Starter 199 / Pro 499 / Enterprise sur devis CHF/mois | `docs/01b-brief-saas-pivot.md` |
+| Filialisation | `Helvètia Intérim SA` distincte avant 1er client externe | ADR-0006 §4 |
+| Migration TLD dédié | Dette future non-bloquante | ADR-0006 §3 |
+
+### État des prompts B
+
+| Sous-sprint | Prompts totaux | Rédigés | Patron complet | Condensés | Non détaillés | Mergés |
+|-------------|----------------|---------|----------------|-----------|---------------|--------|
+| B.0 Fondations | 5 | 5 | B0.1 | B0.2, B0.3, B0.4 ✅, B0.5 | — | **B0.4** (PR #89) |
+| B.1 Onboarding | 5 | 5 | B1.1, B1.2 | B1.3, B1.4, B1.5 | — | — |
+| B.2 Durcissement multi-tenant | 5 | 0 | — | — | B2.1-B2.5 | — |
+| B.3 White-label + multi-cible | 3 | 0 | — | — | B3.1-B3.3 | — |
+| B.4 Support/docs/growth | 5 | 0 | — | — | B4.1-B4.5 | — |
+| B.5 Tests profonds | 6 | 0 | — | — | B5.1-B5.6 | — |
+| **Total** | **29** | **10** | **3** | **7** | **19** | **1** |
+
+Note : 25 prompts catalogue + 4 OPS SaaS transversaux (churn-review, billing-reconcile, staff-audit, tenant-health).
+
+### Prompts B mergés
+
+| Prompt | Date | PR | Commit | Notes |
+|--------|------|----|----|-------|
+| **B0.4** Amendements CLAUDE.md SaaS | 2026-04-25 | #89 | (à compléter post-merge) | CLAUDE.md v1.0 → v1.1 : §10 nouveau (6 sous-sections éditeur SaaS), §3.5 durci (tenant-guard runtime + staff éditeur), §8 escalade SaaS (5 cas), §1 références ADR-0006 + brief 01b. Label `saas-review` ajouté à pr-template. **Débloque l'exécution des autres prompts B touchant du code.** |
+
+### Règles d'exécution Sprint B
+
+1. **Aucun prompt B ne s'exécute avant validation pilote Phase 1** (post J+30), **SAUF** B0.1, B0.2, B0.4, B0.5, B4.2 (docs) qui peuvent être lancés en parallèle pendant le pilote car ne touchent pas au code runtime.
+2. B0.4 (amendements CLAUDE.md SaaS) **doit être mergé avant tout autre prompt B qui touche du code**.
+3. Filialisation juridique (`Helvètia Intérim SA` distincte) **obligatoire avant onboarding du premier client externe**.
+4. Les 19 prompts "non détaillés" seront rédigés en patron complet au moment de leur exécution, pas avant (pour ne pas figer de choix en amont des retours pilote).
+
+### Ordre d'exécution recommandé
+
+- **Pendant le pilote (parallélisable)** : B0.1, B0.2, B0.4, B0.5, B4.2.
+- **Juste après go-live pilote validé (J+30 à J+60)** : B0.3, B1.*, B2.*, B5.4 (user testing avec 5-8 agences amies).
+- **Phase ramp-up (M+2 à M+4)** : B3.*, B4.*, B5.1, B5.2, B5.3, B5.5, B5.6.
+- **Lancement commercial** : dès B5.* verts ET filialisation effective.
+
+---
+
+## 10. Notes de resynchronisation 2026-04-23
 
 PROGRESS.md précédent indiquait "Sprint courant A.1, 5/53 prompts completés" alors que **42/48 prompts catalogue étaient en réalité mergés**. Cause : les sessions A1.2 → A6.4 + design Helvètia ont mis à jour SESSION-LOG.md et le code, mais pas systématiquement PROGRESS.md.
 
