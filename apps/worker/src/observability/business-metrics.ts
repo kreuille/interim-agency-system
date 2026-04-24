@@ -1,5 +1,11 @@
 import { Counter, Gauge, Histogram, type Registry } from 'prom-client';
-import { assertLabelHygiene, createPromRegistry, hashAgencyId } from '@interim/shared';
+// Sub-path explicite pour éviter de tirer prom-client dans le bundle des
+// client components Next.js qui importeraient depuis `@interim/shared`.
+import {
+  assertLabelHygiene,
+  createPromRegistry,
+  hashAgencyId,
+} from '@interim/shared/observability/prom-registry';
 
 /**
  * Business counters Prometheus pour les workers (DETTE-035).
