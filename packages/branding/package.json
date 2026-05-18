@@ -23,6 +23,6 @@
     "@fontsource/jetbrains-mono": "^5.1.2"
   },
   "devDependencies": {
-    "typescript": "^5.6.3"
+    "typescript": "^6.0.3"
   }
 }
